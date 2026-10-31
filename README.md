@@ -88,7 +88,8 @@ uv pip install --python .venv\Scripts\python.exe -e .
 - `data/vts_token.json`：VTS 插件 token；
 - `models/*.onnx`：语音模型，体积大；
 - `data/ndi/`：本地截图；
-- `data/contract.json`：本机模型探测结果；
+- `data/contract.json`：旧版单模型探测结果（兼容用）；
+- `data/profiles/`：**每个模型独立**的参数/校准档案，例如 `data/profiles/1f951c3d0c67414097c15b241322c75c.json`；
 - `.venv/`、缓存、日志。
 
 ## 状态

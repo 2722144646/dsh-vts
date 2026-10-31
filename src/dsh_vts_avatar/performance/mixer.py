@@ -110,6 +110,19 @@ class PerformanceMixer:
         if backend is not None:
             self.backend = backend
         self._mouth_backend = backend or self._decide_backend()
+        # Per-model tuning must win over global config. If a model has no
+        # tuning entry yet, fall back to the global AvatarConfig value.
+        self._blink.per_minute = self._gain("blink_per_min", self.avatar.blink_per_min)
+
+    def _gain(self, name: str, default: float) -> float:
+        if self.profile is not None:
+            value = self.profile.tuning.get(name)
+            if value is not None:
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    pass
+        return float(default)
 
     def set_emotion(self, name: str, intensity: float = 0.7) -> None:
         self.emotion.set(name, intensity)
@@ -172,9 +185,10 @@ class PerformanceMixer:
         brow = emotional["brow"]
         angry = emotional["angry"]
 
-        head_x = heads["x"] + actions.get("yaw", 0.0) * self.avatar.head_gain * self._speech_blend
-        head_y = heads["y"] + actions.get("pitch", 0.0) * self.avatar.head_gain * self._speech_blend
-        head_z = heads["z"] + actions.get("roll", 0.0) * self.avatar.head_gain * self._speech_blend
+        head_gain = self._gain("head_gain", self.avatar.head_gain)
+        head_x = heads["x"] + actions.get("yaw", 0.0) * head_gain * self._speech_blend
+        head_y = heads["y"] + actions.get("pitch", 0.0) * head_gain * self._speech_blend
+        head_z = heads["z"] + actions.get("roll", 0.0) * head_gain * self._speech_blend
         if "eye_wide" in actions:
             eye_base = max(eye_base, clamp(actions["eye_wide"], 0.0, 1.0))
 
@@ -184,6 +198,7 @@ class PerformanceMixer:
 
         params: dict[str, float] = {}
         a = self.avatar
+        mouth_gain = self._gain("mouth_gain", a.mouth_gain)
         jaw = 0.0
         funnel = 0.0
         pucker = 0.0
@@ -199,23 +214,23 @@ class PerformanceMixer:
             # Bilabials close the jaw; other consonants keep a small opening.
             jaw = 0.0 if segment.open <= 0.06 else 0.45 * mouth_open
         if self._mouth_backend in ("continuous", "hybrid"):
-            params[a.mouth_open] = self._sv(a.mouth_open, mouth_open * a.mouth_gain, dt, 0.025, 0.080)
+            params[a.mouth_open] = self._sv(a.mouth_open, mouth_open * mouth_gain, dt, 0.025, 0.080)
         if self._mouth_backend in ("vowel", "hybrid"):
             for name, value in voice.items():
-                target = value * a.mouth_gain
+                target = value * mouth_gain
                 params[name] = self._sv(name, target, dt, 0.020, 0.070)
             # The vowel blendshape defines the shape; MouthOpen supplies the
             # visible jaw opening. Keep it substantial, not a token 0.18.
             params[a.mouth_open] = self._sv(
-                a.mouth_open, mouth_open * 0.85 * a.mouth_gain, dt, 0.025, 0.080
+                a.mouth_open, mouth_open * 0.85 * mouth_gain, dt, 0.025, 0.080
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
-                params[a.jaw_open] = self._sv(a.jaw_open, jaw * a.mouth_gain, dt, 0.025, 0.085)
+                params[a.jaw_open] = self._sv(a.jaw_open, jaw * mouth_gain, dt, 0.025, 0.085)
             if self.profile.has(a.mouth_funnel):
-                params[a.mouth_funnel] = self._sv(a.mouth_funnel, funnel * a.mouth_gain, dt, 0.030, 0.090)
+                params[a.mouth_funnel] = self._sv(a.mouth_funnel, funnel * mouth_gain, dt, 0.030, 0.090)
             if self.profile.has(a.mouth_pucker):
-                params[a.mouth_pucker] = self._sv(a.mouth_pucker, pucker * a.mouth_gain, dt, 0.030, 0.090)
+                params[a.mouth_pucker] = self._sv(a.mouth_pucker, pucker * mouth_gain, dt, 0.030, 0.090)
             if self.profile.has(a.voice_silence):
                 # VTS's automatic lip-sync setup gates the mouth layer with
                 # ParamSilence. Keep it "not silent" for the whole spoken
@@ -322,7 +337,7 @@ class PerformanceMixer:
 
     def _head_targets(self, now: float) -> dict[str, float]:
         t = now - self._started
-        gain = clamp(self.avatar.head_gain, 0.5, 2.5)
+        gain = clamp(self._gain("head_gain", self.avatar.head_gain), 0.5, 3.5)
         x = (
             1.80 * math.sin(2 * math.pi * 0.071 * t)
             + 0.60 * math.sin(2 * math.pi * 0.193 * t + 1.3)

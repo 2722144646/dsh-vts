@@ -18,6 +18,7 @@ class VTSConfig:
     plugin_developer: str = "dsh"
     token_path: Path = Path("data/vts_token.json")
     contract_path: Path = Path("data/contract.json")
+    profile_dir: Path = Path("data/profiles")
     allow_add_fallback: bool = False
 
     @property
@@ -125,6 +126,10 @@ class Config:
         return self.resolve(self.vts.contract_path)  # type: ignore[return-value]
 
     @property
+    def profile_dir(self) -> Path:
+        return self.resolve(self.vts.profile_dir)  # type: ignore[return-value]
+
+    @property
     def voice_model(self) -> Path:
         return self.resolve(self.tts.voice_model)  # type: ignore[return-value]
 
@@ -167,6 +172,7 @@ def load_config(path: str | Path | None = None) -> Config:
         plugin_developer=str(vts_raw.get("plugin_developer", "dsh")),
         token_path=Path(vts_raw.get("token_path", "data/vts_token.json")),
         contract_path=Path(vts_raw.get("contract_path", "data/contract.json")),
+        profile_dir=Path(vts_raw.get("profile_dir", "data/profiles")),
         allow_add_fallback=bool(vts_raw.get("allow_add_fallback", False)),
     )
     cfg.tts = TTSConfig(
@@ -229,6 +235,7 @@ def load_config(path: str | Path | None = None) -> Config:
     # keeps the bridge independent of the process current working directory.
     cfg.vts.token_path = cfg.resolve(cfg.vts.token_path)  # type: ignore[assignment]
     cfg.vts.contract_path = cfg.resolve(cfg.vts.contract_path)  # type: ignore[assignment]
+    cfg.vts.profile_dir = cfg.resolve(cfg.vts.profile_dir)  # type: ignore[assignment]
     cfg.tts.voice_model = cfg.resolve(cfg.tts.voice_model)  # type: ignore[assignment]
     cfg.tts.voice_config = cfg.resolve(cfg.tts.voice_config)
     cfg.ndi.snapshot_dir = cfg.resolve(cfg.ndi.snapshot_dir)  # type: ignore[assignment]
@@ -236,5 +243,5 @@ def load_config(path: str | Path | None = None) -> Config:
 
 
 def ensure_dirs(cfg: Config) -> None:
-    for path in (cfg.token_path.parent, cfg.contract_path.parent, cfg.snapshot_dir):
+    for path in (cfg.token_path.parent, cfg.contract_path.parent, cfg.profile_dir, cfg.snapshot_dir):
         path.mkdir(parents=True, exist_ok=True)

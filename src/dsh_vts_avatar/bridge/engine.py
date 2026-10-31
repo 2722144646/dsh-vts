@@ -19,7 +19,7 @@ from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tag
 from ..tts import PiperTTS, SyntheticTTS
 from ..tts.timeline import Timeline
 from ..vts.client import VTSClient, VTSError
-from ..vts.profile import ModelProfile
+from ..vts.profile import ModelProfile, load_for_model, profile_path
 from .segmentation import Segmenter
 
 log = logging.getLogger(__name__)
@@ -154,8 +154,14 @@ class AvatarEngine:
         model_name = str(model.get("modelName", ""))
         inputs = await self.vts.list_input_params()
         live2d = await self.vts.list_live2d_params()
-        saved = ModelProfile.load(self.config.contract_path)
-        if saved.model_id and saved.model_id == model_id and saved.input_params:
+        saved = load_for_model(self.config.profile_dir, model_id)
+        if not saved.input_params:
+            # Migration fallback: the old single contract.json may hold this
+            # model's tuning/probes. Only use it if the model ID matches.
+            legacy = ModelProfile.load(self.config.contract_path)
+            if legacy.model_id and legacy.model_id == model_id:
+                saved = legacy
+        if saved.input_params:
             saved.model_name = model_name or saved.model_name
             saved.mouth_backend = saved.choose_mouth_backend(self.config.avatar, self.config.avatar.mouth_backend)
             return saved
