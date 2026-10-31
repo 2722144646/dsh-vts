@@ -1,0 +1,81 @@
+# dsh-vts-avatar local configuration.
+# Paths are resolved relative to this file.
+
+[vts]
+host = "127.0.0.1"
+port = 8001
+plugin_name = "dsh VTS Avatar"
+plugin_developer = "dsh"
+token_path = "data/vts_token.json"
+contract_path = "data/contract.json"
+# Set to true only if another VTS plugin already owns a parameter you need.
+allow_add_fallback = false
+
+[tts]
+# Download a voice with:
+#   .venv\Scripts\python.exe -m piper.download_voices --download-dir models zh_CN-huayan-medium
+voice_model = "models/zh_CN-huayan-medium.onnx"
+voice_config = "models/zh_CN-huayan-medium.onnx.json"
+language = "zh"
+length_scale = 1.22
+sentence_silence = 0.08
+
+[audio]
+# Omit `device` to pick the default output device; set an integer to pin one.
+device = 19
+sample_rate = 48000
+buffer_ms = 140
+av_offset_ms = 0
+# Set false to run the VTS performance without audible playback (useful for probing).
+enabled = true
+
+[avatar]
+persona_name = "dsh"
+expressiveness = 0.65
+head_gain = 2.5
+# Head motion: minjerk (minimum-jerk keyframes + light low-pass) or spring.
+head_motion = "minjerk"
+# 0 disables the speed ceiling; the easing curve itself defines the motion.
+head_max_speed = 0.0
+head_spring_hz = 1.9
+head_spring_zeta = 1.0
+mouth_gain = 1.0
+gesture_rate = 0.4
+blink_per_min = 14.0
+# auto | vowel | continuous | hybrid
+mouth_backend = "auto"
+# VTS tracking-parameter names, not Live2D Param* names.
+mouth_open = "MouthOpen"
+mouth_smile = "MouthSmile"
+# VBridger-style continuous inputs; optional, filtered by the contract probe.
+jaw_open = "JawOpen"
+mouth_funnel = "MouthFunnel"
+mouth_pucker = "MouthPucker"
+# VTS auto-lip-sync "silence" gate: 0 while speaking, 1 during pauses.
+voice_silence = "VoiceSilence"
+# Sad / concerned inner brows, optional; filtered by the model profile.
+brow_inner = "BrowInnerUp"
+eye_left = "EyeOpenLeft"
+eye_right = "EyeOpenRight"
+head_x = "FaceAngleX"
+head_y = "FaceAngleY"
+head_z = "FaceAngleZ"
+body_x = "DSHBodyX"
+body_y = "DSHBodyY"
+body_z = "DSHBodyZ"
+voice_a = "VoiceA"
+voice_i = "VoiceI"
+voice_u = "VoiceU"
+voice_e = "VoiceE"
+voice_o = "VoiceO"
+
+[ndi]
+# Empty = first source whose name contains "VTube" (case-insensitive).
+source = ""
+snapshot_dir = "data/ndi"
+snapshot_interval_ms = 500
+
+[bridge]
+host = "127.0.0.1"
+port = 8765
+

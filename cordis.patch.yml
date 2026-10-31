@@ -1,0 +1,5 @@
+- insert:
+    - id: dsh-vts-avatar
+      name: '@local/dsh-vts-avatar'
+      config:
+        bridgeUrl: ws://127.0.0.1:8765

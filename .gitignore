@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Local model files (download separately; too large for Git)
+models/*.onnx
+models/*.onnx.json
+models/*.bin
+models/*.safetensors
+
+# Generated/local data
+data/vts_token.json
+data/contract.json
+data/ndi/
+data/*.log
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local tooling
+tools/
+tmp-*/
+*.tmp
+
+# Node
+node_modules/
+pnpm-lock.yaml
