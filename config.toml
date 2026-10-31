@@ -8,6 +8,9 @@ plugin_name = "dsh VTS Avatar"
 plugin_developer = "dsh"
 token_path = "data/vts_token.json"
 contract_path = "data/contract.json"
+# One file per model: data/profiles/<modelID>.json. Never overwritten by
+# another model's probe or tuning.
+profile_dir = "data/profiles"
 # Set to true only if another VTS plugin already owns a parameter you need.
 allow_add_fallback = false
 

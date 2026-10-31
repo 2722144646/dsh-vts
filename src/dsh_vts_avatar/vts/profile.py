@@ -39,6 +39,9 @@ class ModelProfile:
     live2d_params: dict[str, ParameterInfo] = field(default_factory=dict)
     probes: dict[str, dict[str, Any]] = field(default_factory=dict)
     mouth_backend: str = "auto"
+    # Per-model tuning survives model switches. Keys match AvatarConfig fields,
+    # e.g. head_gain, mouth_gain, jaw_gain, expression_gain.
+    tuning: dict[str, float] = field(default_factory=dict)
     # Live2D params that visibly moved when a tracking input was probed.
     driven_live2d: dict[str, list[str]] = field(default_factory=dict)
 
@@ -93,6 +96,7 @@ class ModelProfile:
             "input_count": len(self.input_params),
             "live2d_count": len(self.live2d_params),
             "mouth_backend": self.mouth_backend,
+            "tuning": dict(self.tuning),
             "has_voice": all(
                 name in self.input_params
                 for name in ("VoiceA", "VoiceI", "VoiceU", "VoiceE", "VoiceO")
@@ -117,6 +121,7 @@ class ModelProfile:
             model_name=str(raw.get("model", {}).get("modelName", "")),
             model_id=str(raw.get("model", {}).get("modelID", "")),
             mouth_backend=str(raw.get("mouth_backend", "auto")),
+            tuning={str(k): float(v) for k, v in (raw.get("tuning") or {}).items()},
         )
         for item in raw.get("input_parameters", []):
             info = ParameterInfo.from_vts(item)
@@ -137,6 +142,7 @@ class ModelProfile:
                 {
                     "model": {"modelName": self.model_name, "modelID": self.model_id},
                     "mouth_backend": self.mouth_backend,
+                    "tuning": dict(self.tuning),
                     "input_parameters": [
                         {
                             "name": p.name,
@@ -166,3 +172,16 @@ class ModelProfile:
             ),
             encoding="utf-8",
         )
+
+
+def profile_path(directory: Path, model_id: str) -> Path:
+    """Stable per-model filename; never overwrite another model's tuning."""
+    safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in model_id)
+    return directory / f"{safe or 'unknown-model'}.json"
+
+
+def load_for_model(directory: Path, model_id: str) -> ModelProfile:
+    path = profile_path(directory, model_id)
+    if path.exists():
+        return ModelProfile.load(path)
+    return ModelProfile(model_id=model_id)

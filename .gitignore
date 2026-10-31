@@ -15,6 +15,7 @@ models/*.safetensors
 # Generated/local data
 data/vts_token.json
 data/contract.json
+data/profiles/
 data/ndi/
 data/*.log
 *.log

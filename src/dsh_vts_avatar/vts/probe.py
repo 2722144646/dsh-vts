@@ -9,7 +9,7 @@ from typing import Any
 
 from ..config import Config
 from .client import VTSClient, VTSError
-from .profile import ModelProfile, ParameterInfo
+from .profile import ModelProfile, ParameterInfo, profile_path
 
 log = logging.getLogger(__name__)
 
@@ -137,8 +137,12 @@ async def run_probe(
             )
 
         profile.mouth_backend = profile.choose_mouth_backend(cfg.avatar, cfg.avatar.mouth_backend)
-        profile.save(cfg.contract_path)
-        log.info("saved contract to %s", cfg.contract_path)
+        target = profile_path(cfg.profile_dir, profile.model_id)
+        previous = ModelProfile.load(target)
+        if previous.tuning:
+            profile.tuning = dict(previous.tuning)
+        profile.save(target)
+        log.info("saved per-model profile to %s", target)
         return profile
     finally:
         await client.close()
