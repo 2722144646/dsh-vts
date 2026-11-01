@@ -24,30 +24,30 @@ SILENCE = VisemeSpec("", "silence", 0.0, 0.0, 0.0)
 
 VOWELS: dict[str, VisemeSpec] = {
     # A
-    "a": VisemeSpec("A", "vowel", 0.82, 0.00, 0.90),
-    "ɑ": VisemeSpec("A", "vowel", 0.82, 0.00, 0.90),
-    "æ": VisemeSpec("A", "vowel", 0.70, 0.05, 0.85),
-    "ʌ": VisemeSpec("A", "vowel", 0.62, 0.00, 0.80),
-    "ɐ": VisemeSpec("A", "vowel", 0.65, 0.00, 0.82),
+    "a": VisemeSpec("A", "vowel", 0.98, 0.00, 0.90),
+    "ɑ": VisemeSpec("A", "vowel", 0.98, 0.00, 0.90),
+    "æ": VisemeSpec("A", "vowel", 0.90, 0.05, 0.85),
+    "ʌ": VisemeSpec("A", "vowel", 0.88, 0.00, 0.80),
+    "ɐ": VisemeSpec("A", "vowel", 0.88, 0.00, 0.82),
     # I
-    "i": VisemeSpec("I", "vowel", 0.34, 0.38, 0.82),
-    "ɪ": VisemeSpec("I", "vowel", 0.32, 0.35, 0.78),
-    "y": VisemeSpec("I", "vowel", 0.34, 0.30, 0.80),
-    "ʏ": VisemeSpec("I", "vowel", 0.34, 0.30, 0.78),
+    "i": VisemeSpec("I", "vowel", 0.55, 0.38, 0.82),
+    "ɪ": VisemeSpec("I", "vowel", 0.52, 0.35, 0.78),
+    "y": VisemeSpec("I", "vowel", 0.52, 0.30, 0.80),
+    "ʏ": VisemeSpec("I", "vowel", 0.52, 0.30, 0.78),
     # U
-    "u": VisemeSpec("U", "vowel", 0.30, -0.48, 0.82),
-    "ʊ": VisemeSpec("U", "vowel", 0.28, -0.42, 0.78),
-    "ʉ": VisemeSpec("U", "vowel", 0.30, -0.40, 0.80),
+    "u": VisemeSpec("U", "vowel", 0.58, -0.48, 0.82),
+    "ʊ": VisemeSpec("U", "vowel", 0.54, -0.42, 0.78),
+    "ʉ": VisemeSpec("U", "vowel", 0.55, -0.40, 0.80),
     # E
-    "e": VisemeSpec("E", "vowel", 0.48, 0.16, 0.82),
-    "ɛ": VisemeSpec("E", "vowel", 0.52, 0.12, 0.80),
-    "ə": VisemeSpec("E", "vowel", 0.40, 0.05, 0.75),
-    "ɤ": VisemeSpec("E", "vowel", 0.48, 0.05, 0.82),
-    "ɜ": VisemeSpec("E", "vowel", 0.46, 0.05, 0.78),
+    "e": VisemeSpec("E", "vowel", 0.78, 0.16, 0.82),
+    "ɛ": VisemeSpec("E", "vowel", 0.80, 0.12, 0.80),
+    "ə": VisemeSpec("E", "vowel", 0.62, 0.05, 0.75),
+    "ɤ": VisemeSpec("E", "vowel", 0.78, 0.05, 0.82),
+    "ɜ": VisemeSpec("E", "vowel", 0.72, 0.05, 0.78),
     # O
-    "o": VisemeSpec("O", "vowel", 0.66, -0.32, 0.86),
-    "ɔ": VisemeSpec("O", "vowel", 0.70, -0.35, 0.86),
-    "ɒ": VisemeSpec("O", "vowel", 0.74, -0.25, 0.86),
+    "o": VisemeSpec("O", "vowel", 0.92, -0.32, 0.86),
+    "ɔ": VisemeSpec("O", "vowel", 0.94, -0.35, 0.86),
+    "ɒ": VisemeSpec("O", "vowel", 0.96, -0.25, 0.86),
 }
 
 # Coarse consonant classes. `open` is the jaw/lip opening while the phone is

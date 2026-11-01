@@ -256,7 +256,7 @@ class PerformanceMixer:
             elif segment.viseme == "U":
                 funnel = 0.22
                 pucker = 0.52
-            jaw = 0.65 * mouth_open
+            jaw = 0.75 * mouth_open
         elif segment.kind == "consonant":
             # Bilabials close the jaw; other consonants keep a small opening.
             jaw = 0.0 if segment.open <= 0.06 else 0.45 * mouth_open
@@ -272,9 +272,10 @@ class PerformanceMixer:
                 target = value * mouth_gain
                 params[name] = self._sv(name, target, dt, 0.020, 0.070)
             # The vowel blendshape defines the shape; MouthOpen supplies the
-            # visible jaw opening. Keep it substantial, not a token 0.18.
+            # visible jaw opening. Do not scale it down a second time after the
+            # viseme curve has already been calibrated to the model ceiling.
             params[a.mouth_open] = self._sv(
-                a.mouth_open, mouth_open * 0.85 * mouth_gain, dt, 0.025, 0.080
+                a.mouth_open, mouth_open * mouth_gain, dt, 0.025, 0.080
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
@@ -402,10 +403,12 @@ class PerformanceMixer:
             if segment.viseme:
                 voice = {self._voice_param(segment.viseme): segment.vowel_gain * 0.35}
             return {"open": open_value, "form": 0.0, "voice": voice, "viseme": segment.viseme}
-        # Vowel: RMS modulates amplitude with a floor so /i/ and /u/ survive.
-        amp = 0.35 + 0.65 * env
+        # Vowel: RMS modulates amplitude, but the model's useful visual range
+        # must be reached on normal speech; a low floor made every mouth look
+        # half-open. The viseme openness already encodes the vowel identity.
+        amp = 0.72 + 0.28 * env
         open_value = segment.open * amp
-        vowel = segment.vowel_gain * (0.55 + 0.45 * env)
+        vowel = segment.vowel_gain * (0.65 + 0.35 * env)
         voice = {self._voice_param(segment.viseme): vowel}
         return {"open": open_value, "form": segment.form, "voice": voice, "viseme": segment.viseme}
 
