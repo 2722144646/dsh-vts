@@ -186,6 +186,23 @@ class PerformanceMixer:
         angry = emotional["angry"]
 
         head_gain = self._gain("head_gain", self.avatar.head_gain)
+        mapping = (
+            self.profile.expression_map.get(self.emotion.preset)
+            if self.profile is not None
+            else None
+        )
+        mapping_strength = clamp(
+            self.emotion.preset_intensity * self._gain("expression_gain", 1.0),
+            0.0,
+            1.0,
+        )
+        if mapping:
+            # A model-specific map can add its own neck bias; this is what
+            # makes "sad" bow the head instead of only lowering the eyelids.
+            heads["x"] += mapping.get("FaceAngleX", 0.0) * mapping_strength
+            heads["y"] += mapping.get("FaceAngleY", 0.0) * mapping_strength
+            heads["z"] += mapping.get("FaceAngleZ", 0.0) * mapping_strength
+            mouth_open = max(mouth_open, mapping.get("MouthOpen", 0.0) * mapping_strength)
         head_x = heads["x"] + actions.get("yaw", 0.0) * head_gain * self._speech_blend
         head_y = heads["y"] + actions.get("pitch", 0.0) * head_gain * self._speech_blend
         head_z = heads["z"] + actions.get("roll", 0.0) * head_gain * self._speech_blend
@@ -294,6 +311,42 @@ class PerformanceMixer:
             params[a.brow_inner] = self._sv(
                 a.brow_inner, clamp(emotional["inner_brow"], 0, 1), dt, 0.18, 0.55
             )
+
+        if mapping and mapping_strength > 0.001:
+            # Direct per-model expression parameters. This is intentionally
+            # applied after the generic template so 蒂亚 can use her own
+            # brow/eye/head vocabulary while other models keep the fallback.
+            direct = {
+                a.mouth_smile: "MouthSmile",
+                a.eye_left: "EyeOpenLeft",
+                a.eye_right: "EyeOpenRight",
+                "Brows": "Brows",
+                "FaceAngry": "FaceAngry",
+                "EyeLeftX": "EyeLeftX",
+                "EyeRightX": "EyeRightX",
+                "EyeLeftY": "EyeLeftY",
+                "EyeRightY": "EyeRightY",
+                "BrowLeftY": "BrowLeftY",
+                "BrowRightY": "BrowRightY",
+            }
+            for param, key in direct.items():
+                if key not in mapping:
+                    continue
+                if self.profile is not None and self.profile.input_params and not self.profile.has(key):
+                    continue
+                current = params.get(param, mapping[key])
+                target = current * (1.0 - mapping_strength) + mapping[key] * mapping_strength
+                params[param] = self._sv(param, target, dt, 0.18, 0.45)
+            if (
+                a.brow_inner in mapping
+                and self.profile is not None
+                and (not self.profile.input_params or self.profile.has(a.brow_inner))
+            ):
+                target = (
+                    params.get(a.brow_inner, mapping[a.brow_inner]) * (1.0 - mapping_strength)
+                    + mapping[a.brow_inner] * mapping_strength
+                )
+                params[a.brow_inner] = self._sv(a.brow_inner, target, dt, 0.18, 0.45)
 
         if self.profile is not None:
             params = self.profile.filter(params)

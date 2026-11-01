@@ -50,3 +50,23 @@ def test_negation_and_intensifier_are_automatic():
     assert emotion_from_text("不生气")[0] == "calm"
     assert emotion_from_text("太开心了")[1] > 0.8
     assert emotion_from_text("有点难过")[1] < 0.8
+
+
+def test_direct_model_mapping_overrides_template():
+    from dsh_vts_avatar.tts.timeline import Timeline
+    from dsh_vts_avatar.vts.profile import ModelProfile
+
+    profile = ModelProfile(
+        model_id="t",
+        tuning={"expression_gain": 1.0},
+        expression_map={"happy": {"MouthSmile": 1.0, "EyeOpenLeft": 0.5, "EyeOpenRight": 0.5}},
+    )
+    mixer = PerformanceMixer(AvatarConfig(mouth_backend="continuous"), 48000, profile=profile)
+    mixer.set_emotion("happy", 1.0)
+    mixer.emotion.preset_intensity = 1.0
+    timeline = Timeline.synthetic("你好", sample_rate=48000)
+    now = time.perf_counter()
+    for i in range(30):
+        params = mixer.compute(1000 + i * 1600, timeline, now + i * 0.05)
+    assert params["MouthSmile"] > 0.8
+    assert params["EyeOpenLeft"] < 0.9
