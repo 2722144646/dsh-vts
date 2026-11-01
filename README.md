@@ -67,9 +67,14 @@ uv pip install --python .venv\Scripts\python.exe -e .
 # 有声运行桥接服务
 .venv\Scripts\python.exe -m dsh_vts_avatar --config dsh-vts-avatar\config.toml serve
 
-# 不接 dsh，直接测试一句
+# 直接测试一句
 .venv\Scripts\python.exe -m dsh_vts_avatar --config dsh-vts-avatar\config.toml demo "你好，我是 dsh。"
+
+# 只读录制一个用户自定义表情（先停桥接，避免写入抢参数）
+.venv\Scripts\python.exe -m dsh_vts_avatar --config dsh-vts-avatar\config.toml record --name "委屈2" --seconds 5
 ```
+
+`record` 会暂停所有参数写入，只读取 VTS 的输入参数和 Live2D 参数；用户在 VTS 里做表情，结束后把 delta、范围和峰值保存到当前模型档案，并生成一个可直接用名字调用的表达式映射。
 
 桥接 WebSocket：`ws://127.0.0.1:8765`。
 
@@ -82,7 +87,8 @@ uv pip install --python .venv\Scripts\python.exe -e .
 
 - `vts_avatar_look`：抓一张 NDI 当前画面，返回路径和运动指标；
 - `vts_avatar_say`：让角色念一句测试文本；
-- `vts_avatar_emote`：显式设置表情（happy/sad/angry/surprised/thinking/shy/wronged/calm/neutral）。
+- `vts_avatar_emote`：显式设置表情（预设或已录制的自定义表情名）；
+- `vts_avatar_record`：只读录制用户做出的自定义表情，保存参数 delta 和范围。
 
 ## 不提交的内容
 

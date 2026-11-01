@@ -134,6 +134,20 @@ class BridgeServer:
                 str(msg.get("name") or "neutral"),
                 float(msg.get("intensity", 0.7)),
             )
+        elif mtype == "record":
+            summary = await self.engine.record_expression(
+                str(msg.get("name") or "learned"),
+                float(msg.get("seconds", 4.0)),
+            )
+            await ws.send(
+                orjson.dumps(
+                    {
+                        "type": "record.result",
+                        "request_id": msg.get("request_id"),
+                        "summary": summary,
+                    }
+                ).decode("utf-8")
+            )
         elif mtype == "head_demo":
             ok = self.engine.demo_head(
                 curve=str(msg.get("curve") or "minjerk"),
