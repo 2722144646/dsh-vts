@@ -285,23 +285,17 @@ class PerformanceMixer:
                 mouth_open * mouth_gain,
                 dt,
                 0.012 if segment.kind == "consonant" else 0.025,
-                0.060 if segment.kind == "consonant" else 0.080,
+                0.035 if segment.kind == "consonant" else 0.080,
             )
         if self._mouth_backend in ("vowel", "hybrid"):
             # Always write all five voice params. Previously a consonant
             # returned an empty voice dict, so VTS kept the last vowel alive
             # through /p/ /b/ /m/ and the mouth no longer matched the text.
-            voice_defaults = {
-                a.voice_a: "A",
-                a.voice_i: "I",
-                a.voice_u: "U",
-                a.voice_e: "E",
-                a.voice_o: "O",
-            }
-            for name, vowel in voice_defaults.items():
-                target = float(voice.get(vowel, 0.0)) * mouth_gain
+            for name in (a.voice_a, a.voice_i, a.voice_u, a.voice_e, a.voice_o):
+                target = float(voice.get(name, 0.0)) * mouth_gain
                 params[name] = self._sv(
-                    name, target, dt, 0.012 if segment.kind == "consonant" else 0.020, 0.055
+                    name, target, dt, 0.012 if segment.kind == "consonant" else 0.020,
+                    0.030 if segment.kind == "consonant" else 0.055,
                 )
             # The vowel blendshape defines the shape; MouthOpen supplies the
             # visible jaw opening. Do not scale it down a second time after the
@@ -311,7 +305,7 @@ class PerformanceMixer:
                 mouth_open * mouth_gain,
                 dt,
                 0.012 if segment.kind == "consonant" else 0.025,
-                0.060 if segment.kind == "consonant" else 0.080,
+                0.035 if segment.kind == "consonant" else 0.080,
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
