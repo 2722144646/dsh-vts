@@ -71,6 +71,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message.metrics ?? null);
         }
+      } else if (message.type === 'record.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message.summary ?? null);
+        }
       } else if (message.type === 'error') {
         console.warn('[vts-avatar] bridge error:', message.code, message.message ?? '');
       }
@@ -296,8 +303,7 @@ export function apply(ctx, config = {}) {
           properties: {
             name: {
               type: 'string',
-              enum: ['happy', 'sad', 'angry', 'surprised', 'thinking', 'shy', 'wronged', 'calm', 'neutral'],
-              description: 'Expression preset.',
+              description: 'Preset or learned expression name.',
             },
             intensity: {
               type: 'number',
@@ -331,6 +337,48 @@ export function apply(ctx, config = {}) {
           const sent = client.send({ type: 'emotion', name, intensity });
           if (!sent) return { ok: false, error: 'bridge is not connected' };
           return { ok: true, name, intensity };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_record',
+        description:
+          'Record a user-performed expression in read-only mode. The bridge pauses all parameter writes, ' +
+          'the user performs the expression in VTS, and the resulting parameter deltas are saved on the current model.',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Name for this learned expression.' },
+            seconds: { type: 'number', minimum: 1, maximum: 10, description: 'Recording duration; default 4.' },
+          },
+          required: ['name'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [
+            {
+              type: 'text',
+              text: value?.ok
+                ? `Recorded ${value.name}; top inputs: ${(value.summary?.top_inputs ?? []).slice(0, 6).join(', ')}`
+                : `Recording failed: ${value?.error}`,
+            },
+          ],
+        },
+        async execute(args) {
+          const name = String(args?.name ?? 'learned').trim();
+          const seconds = Number(args?.seconds ?? 4);
+          try {
+            const summary = await client.request(
+              'record',
+              { name, seconds },
+              Math.max(8000, (Number.isFinite(seconds) ? seconds : 4) * 1000 + 6000),
+            );
+            if (!summary) return { ok: false, error: 'empty record result' };
+            return { ok: true, name, summary };
+          } catch (error) {
+            return { ok: false, error: String(error?.message ?? error) };
+          }
         },
       }),
 

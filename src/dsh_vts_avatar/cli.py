@@ -15,8 +15,10 @@ from .bridge.engine import AvatarEngine
 from .bridge.server import run_bridge
 from .config import ensure_dirs, load_config
 from .ndi.capture import NDICapture, list_sources
+from .performance.recorder import record_expression
 from .vts.client import VTSClient
 from .vts.probe import run_probe
+from .vts.profile import ModelProfile, profile_path
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +69,31 @@ async def _cmd_demo(args) -> int:
     finally:
         await engine.close()
     return 0
+
+
+async def _cmd_record(args) -> int:
+    cfg = load_config(args.config)
+    ensure_dirs(cfg)
+    client = VTSClient(cfg.vts)
+    await client.connect()
+    try:
+        model = await client.current_model()
+        model_id = str(model.get("modelID", ""))
+        profile = ModelProfile.load(profile_path(cfg.profile_dir, model_id))
+        print("Read-only recording. Do the expression in VTS now.", flush=True)
+        summary = await record_expression(client, args.name, duration_s=args.seconds)
+        profile.learned_expressions[args.name] = summary
+        direct = {
+            key: float(info["peak"])
+            for key, info in summary.get("input_deltas", {}).items()
+            if abs(float(info.get("delta", 0.0))) >= 0.02
+        }
+        profile.expression_map[args.name] = direct
+        profile.save(profile_path(cfg.profile_dir, model_id))
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return 0
+    finally:
+        await client.close()
 
 
 async def _print_event(payload: dict) -> None:
@@ -122,6 +149,10 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--seconds", type=float, default=6.0)
     demo.add_argument("--no-audio", action="store_true")
 
+    record = sub.add_parser("record", help="read-only capture of a user-performed expression")
+    record.add_argument("--name", required=True, help="learned expression name")
+    record.add_argument("--seconds", type=float, default=4.0)
+
     ndi = sub.add_parser("ndi", help="list or capture the VTS NDI feed")
     ndi.add_argument("--list", action="store_true")
     ndi.add_argument("--source", default="")
@@ -141,6 +172,8 @@ def main(argv: list[str] | None = None) -> int:
             return asyncio.run(_cmd_serve(args))
         if args.command == "demo":
             return asyncio.run(_cmd_demo(args))
+        if args.command == "record":
+            return asyncio.run(_cmd_record(args))
         if args.command == "ndi":
             return _cmd_ndi(args)
     except KeyboardInterrupt:

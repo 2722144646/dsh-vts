@@ -49,7 +49,7 @@ class EmotionState:
         self.target_valence = v * intensity
         self.target_arousal = a * intensity
         self.target_intensity = intensity
-        self.preset = name if name in EXPRESSION_TARGETS else "neutral"
+        self.preset = name
         self.target_preset_intensity = intensity
         # Do not jump the current value; let update() ease into the target.
         # A tiny immediate nudge keeps the face from feeling one beat late.

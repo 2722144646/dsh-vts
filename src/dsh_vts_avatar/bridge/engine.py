@@ -16,6 +16,7 @@ from ..audio.engine import Clock, make_clock
 from ..config import Config
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
+from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
 from ..tts.timeline import Timeline
 from ..vts.client import VTSClient, VTSError
@@ -59,6 +60,7 @@ class AvatarEngine:
         self._model_id = self.profile.model_id
         self._last_model_check = 0.0
         self._model_refreshing = False
+        self._recording = False
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -380,6 +382,33 @@ class AvatarEngine:
         if self.mixer is not None:
             self.mixer.set_emotion(name, intensity)
 
+    async def record_expression(self, name: str, seconds: float = 4.0) -> dict[str, Any]:
+        """Read-only capture of a user-performed expression.
+
+        The 30 Hz writer is paused for the whole capture; the user can move
+        VTS with the mouse, face tracking, or VTS actions without our writes
+        fighting them. The resulting delta profile is saved on this model.
+        """
+        if not self.vts.authenticated:
+            raise RuntimeError("VTS is not connected")
+        self._recording = True
+        try:
+            summary = await record_expression(self.vts, name, duration_s=seconds)
+            if self.profile is not None:
+                self.profile.learned_expressions[name] = summary
+                direct = {
+                    key: float(info["peak"])
+                    for key, info in summary.get("input_deltas", {}).items()
+                    if abs(float(info.get("delta", 0.0))) >= 0.02
+                }
+                self.profile.expression_map[name] = direct
+                self.profile.save(profile_path(self.config.profile_dir, self.profile.model_id))
+                if self.mixer is not None:
+                    self.mixer.set_profile(self.profile)
+            return summary
+        finally:
+            self._recording = False
+
     def demo_head(self, *, curve: str = "minjerk", intensity: float = 0.5, duration_ms: int = 900) -> bool:
         if self.clock is None or self.mixer is None or self.tts is None:
             return False
@@ -453,6 +482,10 @@ class AvatarEngine:
         next_at = asyncio.get_running_loop().time()
         while not self._closing:
             now = time.perf_counter()
+            if self._recording:
+                # Record-only mode: never write while the user is performing.
+                await asyncio.sleep(period)
+                continue
             if self.vts.authenticated and now - self._last_model_check >= 2.0:
                 self._last_model_check = now
                 asyncio.create_task(self._refresh_model(), name="avatar-model-refresh")
