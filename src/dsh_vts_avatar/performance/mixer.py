@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 import random
 import time
+from bisect import bisect_right
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -207,7 +208,7 @@ class PerformanceMixer:
         rms = timeline.rms_at(sample) if timeline is not None else 0.0
         env = _energy(rms)
 
-        speech = self._speech(segment, env)
+        speech = self._speech_coarticulated(timeline, int(sample), segment, env)
         emotional = self._emotion_targets()
         heads = self._head_targets(now)
         actions = self._action_targets(int(sample))
@@ -416,6 +417,58 @@ class PerformanceMixer:
         return {key: float(value) for key, value in params.items() if value == value}
 
     # -- speech -----------------------------------------------------------
+
+    @staticmethod
+    def _blend_speech(a: dict[str, object], b: dict[str, object], weight: float) -> dict[str, object]:
+        weight = clamp(weight, 0.0, 1.0)
+        voice_a = a.get("voice") or {}
+        voice_b = b.get("voice") or {}
+        voice = {}
+        for key in set(voice_a) | set(voice_b):
+            voice[key] = float(voice_a.get(key, 0.0)) * (1.0 - weight) + float(voice_b.get(key, 0.0)) * weight
+        return {
+            "open": float(a.get("open", 0.0)) * (1.0 - weight) + float(b.get("open", 0.0)) * weight,
+            "form": float(a.get("form", 0.0)) * (1.0 - weight) + float(b.get("form", 0.0)) * weight,
+            "voice": voice,
+            "viseme": a.get("viseme", "") if weight < 0.5 else b.get("viseme", ""),
+        }
+
+    def _speech_coarticulated(
+        self,
+        timeline: Timeline | None,
+        sample: int,
+        segment: VisemeSegment,
+        env: float,
+    ) -> dict[str, object]:
+        """Blend 30ms of the previous shape and 20ms of the next shape.
+
+        A hard switch at phoneme boundaries is what makes lips look like a
+        slideshow. The viseme still owns the identity; neighbours only bleed
+        into the transition.
+        """
+        base = self._speech(segment, env)
+        if timeline is None or len(timeline.segments) < 2:
+            return base
+        starts = getattr(timeline, "_starts", None)
+        if not starts:
+            return base
+        index = bisect_right(starts, sample) - 1
+        if index < 0 or index >= len(timeline.segments):
+            return base
+        current = timeline.segments[index]
+        if current.start != segment.start or current.end != segment.end:
+            return base
+        pre = max(1, int(self.sample_rate * 0.030))
+        post = max(1, int(self.sample_rate * 0.020))
+        if index > 0 and sample - current.start < pre:
+            previous = self._speech(timeline.segments[index - 1], env)
+            weight = 0.35 * (1.0 - (sample - current.start) / pre)
+            return self._blend_speech(previous, base, 1.0 - weight)
+        if index + 1 < len(timeline.segments) and current.end - sample < post:
+            following = self._speech(timeline.segments[index + 1], env)
+            weight = 0.35 * (1.0 - (current.end - sample) / post)
+            return self._blend_speech(base, following, weight)
+        return base
 
     def _speech(self, segment: VisemeSegment, env: float) -> dict[str, object]:
         if segment.kind == "silence":
