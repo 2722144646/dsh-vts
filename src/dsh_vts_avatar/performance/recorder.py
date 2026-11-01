@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import multiprocessing as mp
 import threading
 import time
 import wave
@@ -98,38 +99,90 @@ class _AudioCapture:
 
 
 class _FrameCapture:
-    """Capture NDI frames on its own thread so parameter polling stays at 20Hz."""
+    """Capture NDI frames in a separate process.
+
+    JPEG encoding is CPU-heavy; doing it in the same Python process fights the
+    asyncio parameter poller for the GIL. A child process keeps 30fps capture
+    and parameter polling independent.
+    """
 
     def __init__(self, ndi: Any, frame_dir: Path, start_time: float):
-        self.ndi = ndi
+        self.source_hint = str(getattr(ndi, "source_hint", "") or "")
         self.frame_dir = frame_dir
         self.start_time = start_time
-        self.events: list[dict[str, Any]] = []
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, name="ndi-capture", daemon=True)
-        self._count = 0
+        self.events_path = frame_dir.parent / "frames.events.jsonl"
+        self._ctx = mp.get_context("spawn")
+        self._stop = self._ctx.Event()
+        self._proc = self._ctx.Process(
+            target=_frame_worker,
+            args=(
+                self.source_hint,
+                str(frame_dir),
+                start_time,
+                str(self.events_path),
+                self._stop,
+            ),
+            name="ndi-capture",
+            daemon=True,
+        )
+        self.fps = 30.0
+        self.warmup_s = 1.0
 
     def start(self) -> None:
-        self._thread.start()
+        self._proc.start()
 
-    def _run(self) -> None:
-        next_at = time.perf_counter()
-        while not self._stop.is_set():
+    def stop(self) -> list[dict[str, Any]]:
+        self._stop.set()
+        self._proc.join(timeout=5.0)
+        if self._proc.is_alive():
+            self._proc.terminate()
+            self._proc.join(timeout=2.0)
+        events: list[dict[str, Any]] = []
+        if self.events_path.exists():
+            for line in self.events_path.read_text(encoding="utf-8").splitlines():
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        return events
+
+
+def _frame_worker(
+    source_hint: str,
+    frame_dir: str,
+    start_time: float,
+    events_path: str,
+    stop_event: Any,
+) -> None:
+    import cv2
+
+    from ..ndi.capture import NDICapture
+
+    out_dir = Path(frame_dir)
+    ndi = NDICapture(source_hint=source_hint, snapshot_dir=out_dir)
+    events: list[dict[str, Any]] = []
+    if not ndi.open(wait_ms=4000):
+        Path(events_path).write_text("", encoding="utf-8")
+        return
+    count = 0
+    started = time.perf_counter()
+    next_at = started
+    try:
+        while not stop_event.is_set():
             try:
-                frame, _ = self.ndi.capture(timeout_ms=120)
+                frame, _ = ndi.capture(timeout_ms=120)
             except Exception:
                 frame = None
-            if frame is not None:
-                self._count += 1
-                name = f"frame_{self._count:05d}.jpg"
-                ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+            if frame is not None and time.perf_counter() - started >= 1.0:
+                count += 1
+                name = f"frame_{count:05d}.jpg"
+                frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+                ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
                 if ok:
-                    # cv2.imwrite does not reliably handle non-ASCII Windows
-                    # paths; write the encoded JPEG through pathlib instead.
-                    (self.frame_dir / name).write_bytes(encoded.tobytes())
-                    self.events.append(
+                    (out_dir / name).write_bytes(encoded.tobytes())
+                    events.append(
                         {
-                            "t": round(time.perf_counter() - self.start_time, 4),
+                            "t": round(time.perf_counter() - start_time, 4),
                             "file": f"frames/{name}",
                         }
                     )
@@ -139,11 +192,20 @@ class _FrameCapture:
                 next_at = time.perf_counter()
                 delay = 0
             time.sleep(delay)
+    finally:
+        ndi.close()
+        Path(events_path).write_text(
+            "\n".join(json.dumps(event, ensure_ascii=False) for event in events) + ("\n" if events else ""),
+            encoding="utf-8",
+        )
 
-    def stop(self) -> list[dict[str, Any]]:
-        self._stop.set()
-        self._thread.join(timeout=2.0)
-        return self.events
+
+async def _sample_input(client: VTSClient) -> dict[str, float]:
+    return _values(await client.list_input_params())
+
+
+async def _sample_live(client: VTSClient) -> dict[str, float]:
+    return _live_values(await client.list_live2d_params())
 
 
 async def _sample(client: VTSClient) -> tuple[dict[str, float], dict[str, float]]:
@@ -158,7 +220,8 @@ async def record_expression(
     *,
     duration_s: float = 4.0,
     baseline_s: float = 0.8,
-    hz: float = 20.0,
+    hz: float = 10.0,
+    live_every: int = 2,
     on_start: Callable[[], None] | None = None,
     on_done: Callable[[], None] | None = None,
     ndi: Any | None = None,
@@ -214,10 +277,12 @@ async def record_expression(
     baseline_inputs: list[dict[str, float]] = []
     baseline_live: list[dict[str, float]] = []
 
-    for _ in range(max(1, math.ceil(baseline_s * hz))):
-        i, l = await _sample(client)
+    for index in range(max(1, math.ceil(baseline_s * hz))):
+        i = await _sample_input(client)
+        l = await _sample_live(client) if index % max(1, live_every) == 0 else {}
         baseline_inputs.append(i)
-        baseline_live.append(l)
+        if l:
+            baseline_live.append(l)
         write_sample("baseline", i, l)
         await asyncio.sleep(period)
 
@@ -236,9 +301,12 @@ async def record_expression(
     samples_live: list[dict[str, float]] = []
     started = time.perf_counter()
     while time.perf_counter() - started < duration_s:
-        i, l = await _sample(client)
+        index = len(samples_inputs)
+        i = await _sample_input(client)
+        l = await _sample_live(client) if index % max(1, live_every) == 0 else {}
         samples_inputs.append(i)
-        samples_live.append(l)
+        if l:
+            samples_live.append(l)
         write_sample("expression", i, l)
         await asyncio.sleep(period)
     if on_done is not None:
@@ -283,6 +351,8 @@ async def record_expression(
         "model_name": str(model.get("modelName", "")),
         "duration_s": round(duration_s, 2),
         "samples": len(samples_inputs),
+        "live2d_samples": len(samples_live),
+        "frame_fps": 30,
         "baseline_inputs": {k: round(v, 5) for k, v in base_in.items()},
         "input_deltas": inputs,
         "live2d_deltas": live,
