@@ -25,7 +25,7 @@ sentence_silence = 0.08
 
 [audio]
 # Omit `device` to pick the default output device; set an integer to pin one.
-device = 19
+device = 17
 sample_rate = 48000
 buffer_ms = 140
 av_offset_ms = 0
