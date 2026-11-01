@@ -12,9 +12,22 @@ import asyncio
 import math
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from ..vts.client import VTSClient
+
+NEUTRAL = {
+    "MouthOpen": 0.0, "MouthSmile": 0.10, "JawOpen": 0.0,
+    "MouthFunnel": 0.0, "MouthPucker": 0.0, "MouthShrug": 0.0,
+    "MouthPressLipOpen": 0.0, "MouthX": 0.0, "CheekPuff": 0.0,
+    "TongueOut": 0.0, "VoiceA": 0.0, "VoiceI": 0.0, "VoiceU": 0.0,
+    "VoiceE": 0.0, "VoiceO": 0.0, "VoiceSilence": 1.0,
+    "FaceAngleX": 0.0, "FaceAngleY": 0.0, "FaceAngleZ": 0.0,
+    "EyeOpenLeft": 1.0, "EyeOpenRight": 1.0,
+    "EyeLeftX": 0.0, "EyeLeftY": 0.0, "EyeRightX": 0.0, "EyeRightY": 0.0,
+    "Brows": 0.10, "BrowInnerUp": 0.0, "BrowLeftY": 0.0, "BrowRightY": 0.0,
+    "FaceAngry": 0.0,
+}
 
 
 def _values(raw: dict[str, Any]) -> dict[str, float]:
@@ -48,14 +61,19 @@ async def record_expression(
     duration_s: float = 4.0,
     baseline_s: float = 0.8,
     hz: float = 20.0,
+    on_start: Callable[[], None] | None = None,
+    on_done: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     duration_s = max(1.0, min(15.0, float(duration_s)))
     hz = max(5.0, min(30.0, float(hz)))
     model = await client.current_model()
     period = 1.0 / hz
 
-    # Let the caller's last injected frame expire before reading the user.
-    await asyncio.sleep(0.45)
+    # VTS keeps the last injected value after a plugin stops writing. Send one
+    # neutral frame so the baseline is not polluted by the previous expression,
+    # then go read-only for the actual take.
+    await client.inject(NEUTRAL)
+    await asyncio.sleep(1.0)
     baseline_inputs: list[dict[str, float]] = []
     baseline_live: list[dict[str, float]] = []
     for _ in range(max(1, math.ceil(baseline_s * hz))):
@@ -73,6 +91,8 @@ async def record_expression(
 
     base_in = average(baseline_inputs)
     base_live = average(baseline_live)
+    if on_start is not None:
+        on_start()
     samples_inputs: list[dict[str, float]] = []
     samples_live: list[dict[str, float]] = []
     started = time.perf_counter()
@@ -81,6 +101,8 @@ async def record_expression(
         samples_inputs.append(i)
         samples_live.append(l)
         await asyncio.sleep(period)
+    if on_done is not None:
+        on_done()
 
     def summarize(
         base: dict[str, float],

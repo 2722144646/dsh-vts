@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+import subprocess
 import sys
 import time
 
@@ -80,8 +81,39 @@ async def _cmd_record(args) -> int:
         model = await client.current_model()
         model_id = str(model.get("modelID", ""))
         profile = ModelProfile.load(profile_path(cfg.profile_dir, model_id))
-        print("Read-only recording. Do the expression in VTS now.", flush=True)
-        summary = await record_expression(client, args.name, duration_s=args.seconds)
+        print("Read-only recording. Keep neutral until the voice cue, then do the expression.", flush=True)
+
+        def speak(text: str) -> None:
+            try:
+                subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-Command",
+                        "Add-Type -AssemblyName System.Speech; "
+                        f"(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{text}')",
+                    ],
+                    timeout=6,
+                    check=False,
+                )
+            except Exception:
+                pass
+
+        def start_cue() -> None:
+            speak(f"开始，{args.name}")
+            print("START", flush=True)
+
+        def done_cue() -> None:
+            speak("停")
+            print("DONE", flush=True)
+
+        summary = await record_expression(
+            client,
+            args.name,
+            duration_s=args.seconds,
+            on_start=start_cue,
+            on_done=done_cue,
+        )
         profile.learned_expressions[args.name] = summary
         direct = {
             key: float(info["peak"])
