@@ -32,3 +32,14 @@ def test_emotion_set_keeps_preset_name():
     state.set("angry", 0.8)
     assert state.preset == "angry"
     assert state.target_preset_intensity == 0.8
+
+
+def test_expression_gain_is_read_from_model_profile():
+    from dsh_vts_avatar.vts.profile import ModelProfile
+
+    profile = ModelProfile(model_id="t", tuning={"expression_gain": 0.5, "expression_head_gain": 0.5})
+    mixer = PerformanceMixer(AvatarConfig(mouth_backend="continuous"), 48000, profile=profile)
+    mixer.emotion.preset = "happy"
+    mixer.emotion.preset_intensity = 1.0
+    targets = mixer._emotion_targets()
+    assert 0.5 < targets["smile"] < 0.9
