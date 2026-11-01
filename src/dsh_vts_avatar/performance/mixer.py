@@ -144,12 +144,13 @@ class PerformanceMixer:
         # If the user demonstrated a custom expression under a semantic name,
         # prefer that recording over the generic preset. This is the bridge
         # between the demo dataset and live expression selection.
+        # Thinking/shy have no calibrated user take yet. Keep them on the
+        # generic procedural presets so they can still be triggered and
+        # improvised; do not silently replace them with an old learned take.
         alias = {
             "happy": "开心",
             "sad": "难过",
             "surprised": "惊讶",
-            "thinking": "思考",
-            "shy": "害羞",
             "wronged": "委屈",
         }.get((name or "").lower())
         if alias and self.profile is not None and alias in self.profile.expression_map:
