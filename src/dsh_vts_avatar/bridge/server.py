@@ -129,6 +129,11 @@ class BridgeServer:
             self.engine.set_state(str(msg.get("state") or "idle"))
         elif mtype == "action":
             self.engine.add_action(str(msg.get("kind") or "nod"), float(msg.get("intensity", 0.7)))
+        elif mtype == "emotion":
+            self.engine.set_emotion(
+                str(msg.get("name") or "neutral"),
+                float(msg.get("intensity", 0.7)),
+            )
         elif mtype == "head_demo":
             ok = self.engine.demo_head(
                 curve=str(msg.get("curve") or "minjerk"),

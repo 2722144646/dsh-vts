@@ -17,7 +17,7 @@ from ..config import AvatarConfig
 from ..tts.timeline import Timeline, VisemeSegment
 from ..vts.profile import ModelProfile
 from .actions import ActionCue
-from .emotion import EmotionState
+from .emotion import EXPRESSION_HEAD, EXPRESSION_TARGETS, EmotionState
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -324,7 +324,7 @@ class PerformanceMixer:
             angry = min(1.0, (-v) * (a - 0.4) * 1.5)
         inner_brow = max(0.0, -v) * 0.9
         open_emotion = 0.35 * max(0.0, a - 0.65) if v >= 0 else 0.0
-        return {
+        targets = {
             "smile": smile,
             "eye": eye,
             "brow": brow,
@@ -332,6 +332,12 @@ class PerformanceMixer:
             "inner_brow": inner_brow,
             "open": open_emotion,
         }
+        expression = EXPRESSION_TARGETS.get(self.emotion.preset)
+        strength = clamp(self.emotion.preset_intensity, 0.0, 1.0)
+        if expression and strength > 0.001:
+            for key, value in expression.items():
+                targets[key] = targets.get(key, 0.0) * (1.0 - strength) + value * strength
+        return targets
 
     # -- head -------------------------------------------------------------
 
@@ -355,6 +361,11 @@ class PerformanceMixer:
         x += self._state_bias["x"] * self._speech_blend
         y += self._state_bias["y"] * self._speech_blend
         z += self._state_bias["z"] * self._speech_blend
+        expression_head = EXPRESSION_HEAD.get(self.emotion.preset, {})
+        strength = clamp(self.emotion.preset_intensity, 0.0, 1.0)
+        x += expression_head.get("yaw", 0.0) * strength
+        y += expression_head.get("pitch", 0.0) * strength
+        z += expression_head.get("roll", 0.0) * strength
         return {"x": x * gain, "y": y * gain, "z": z * gain}
 
     def _update_state_bias(self, dt: float) -> None:

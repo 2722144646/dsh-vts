@@ -16,6 +16,9 @@ class EmotionState:
     target_valence: float = 0.0
     target_arousal: float = 0.0
     target_intensity: float = 0.0
+    preset: str = "neutral"
+    preset_intensity: float = 0.0
+    target_preset_intensity: float = 0.0
     last_update: float = 0.0
     hold_until: float = 0.0
 
@@ -44,11 +47,16 @@ class EmotionState:
         self.target_valence = v * intensity
         self.target_arousal = a * intensity
         self.target_intensity = intensity
+        self.preset = name if name in EXPRESSION_TARGETS else "neutral"
+        self.target_preset_intensity = intensity
         # Do not jump the current value; let update() ease into the target.
         # A tiny immediate nudge keeps the face from feeling one beat late.
         self.valence += (self.target_valence - self.valence) * 0.12
         self.arousal += (self.target_arousal - self.arousal) * 0.12
         self.intensity += (self.target_intensity - self.intensity) * 0.12
+        self.preset_intensity += (
+            self.target_preset_intensity - self.preset_intensity
+        ) * 0.12
         self.hold_until = time.perf_counter() + 1.8
 
     def update(self, dt: float) -> None:
@@ -59,13 +67,50 @@ class EmotionState:
         self.valence += (self.target_valence - self.valence) * (attack if abs(self.target_valence) > abs(self.valence) else release)
         self.arousal += (self.target_arousal - self.arousal) * (attack if self.target_arousal > self.arousal else release)
         self.intensity += (self.target_intensity - self.intensity) * release
+        self.preset_intensity += (
+            self.target_preset_intensity - self.preset_intensity
+        ) * (attack if self.target_preset_intensity > self.preset_intensity else release)
         # Hold the expression, then drift back toward a calm baseline.
         if time.perf_counter() >= self.hold_until:
             decay = 1.0 - math.exp(-dt / 4.0)
             self.target_valence *= 1.0 - decay * 0.30
             self.target_arousal *= 1.0 - decay * 0.22
             self.target_intensity *= 1.0 - decay * 0.18
+            self.target_preset_intensity *= 1.0 - decay * 0.24
         self.last_update = time.perf_counter()
+
+
+# Distinct, model-agnostic expression targets. The mixer blends these over the
+# continuous valence/arousal baseline; this is what makes "sad" different from
+# "low-energy happy" and "surprised" different from "excited".
+EXPRESSION_TARGETS: dict[str, dict[str, float]] = {
+    "happy": {"smile": 0.92, "eye": 0.95, "brow": 0.28, "angry": 0.0, "inner_brow": 0.05, "open": 0.04},
+    "joy": {"smile": 0.98, "eye": 0.97, "brow": 0.35, "angry": 0.0, "inner_brow": 0.04, "open": 0.06},
+    "excited": {"smile": 0.96, "eye": 0.98, "brow": 0.55, "angry": 0.0, "inner_brow": 0.04, "open": 0.16},
+    "sad": {"smile": 0.03, "eye": 0.74, "brow": 0.02, "angry": 0.0, "inner_brow": 0.88, "open": 0.02},
+    "angry": {"smile": 0.02, "eye": 0.84, "brow": 0.05, "angry": 0.88, "inner_brow": 0.22, "open": 0.03},
+    "surprised": {"smile": 0.18, "eye": 1.0, "brow": 0.92, "angry": 0.0, "inner_brow": 0.10, "open": 0.55},
+    "surprise": {"smile": 0.18, "eye": 1.0, "brow": 0.92, "angry": 0.0, "inner_brow": 0.10, "open": 0.55},
+    "thinking": {"smile": 0.08, "eye": 0.86, "brow": 0.36, "angry": 0.0, "inner_brow": 0.16, "open": 0.02},
+    "curious": {"smile": 0.24, "eye": 0.94, "brow": 0.52, "angry": 0.0, "inner_brow": 0.12, "open": 0.08},
+    "shy": {"smile": 0.52, "eye": 0.82, "brow": 0.18, "angry": 0.0, "inner_brow": 0.26, "open": 0.02},
+    "neutral": {"smile": 0.14, "eye": 0.93, "brow": 0.10, "angry": 0.0, "inner_brow": 0.04, "open": 0.02},
+    "calm": {"smile": 0.20, "eye": 0.90, "brow": 0.08, "angry": 0.0, "inner_brow": 0.06, "open": 0.02},
+}
+
+EXPRESSION_HEAD: dict[str, dict[str, float]] = {
+    "happy": {"yaw": 0.0, "pitch": -0.6, "roll": 1.2},
+    "joy": {"yaw": 0.0, "pitch": -0.8, "roll": 1.8},
+    "excited": {"yaw": 0.0, "pitch": -0.4, "roll": 2.4},
+    "sad": {"yaw": 0.0, "pitch": -3.2, "roll": -1.6},
+    "angry": {"yaw": 0.0, "pitch": 1.2, "roll": -2.6},
+    "surprised": {"yaw": 0.0, "pitch": -2.0, "roll": 0.0},
+    "thinking": {"yaw": 1.0, "pitch": 0.8, "roll": 4.2},
+    "curious": {"yaw": 1.2, "pitch": -0.6, "roll": 3.0},
+    "shy": {"yaw": -0.8, "pitch": -1.0, "roll": 2.8},
+    "neutral": {"yaw": 0.0, "pitch": 0.0, "roll": 0.0},
+    "calm": {"yaw": 0.0, "pitch": 0.0, "roll": 0.4},
+}
 
 
 _LEXICON: dict[str, tuple[str, float]] = {
