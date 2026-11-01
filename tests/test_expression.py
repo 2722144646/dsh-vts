@@ -27,6 +27,15 @@ def test_emotion_preset_blends_into_mixer_targets():
     assert surprised["open"] > sad["open"]
 
 
+def test_thinking_keeps_improvised_preset_without_standard_take():
+    from dsh_vts_avatar.vts.profile import ModelProfile
+
+    profile = ModelProfile(model_id="t", expression_map={"思考": {"MouthSmile": 0.1}})
+    mixer = PerformanceMixer(AvatarConfig(mouth_backend="continuous"), 48000, profile=profile)
+    mixer.set_emotion("thinking", 1.0)
+    assert mixer.emotion.preset == "thinking"
+
+
 def test_learned_expression_alias_is_used():
     from dsh_vts_avatar.vts.profile import ModelProfile
 
