@@ -204,7 +204,11 @@ class PerformanceMixer:
         actions = self._action_targets(int(sample))
         blink = self._blink.update(now)
 
-        smile = clamp(emotional["smile"] + speech["form"] * 0.20, -1.0, 1.0)
+        smile = clamp(
+            emotional["smile"] + speech["form"] * 0.20 + actions.get("smile", 0.0) * 0.5,
+            -1.0,
+            1.0,
+        )
         mouth_open = max(speech["open"], emotional["open"])
         if self.state == "thinking":
             mouth_open *= 0.25
@@ -332,20 +336,33 @@ class PerformanceMixer:
             if self.profile is not None and self.profile.has(eye_name):
                 axis = "gaze_x" if eye_name.endswith("X") else "gaze_y"
                 idle = idle_gaze_x if axis == "gaze_x" else idle_gaze_y
-                target = emotional.get(axis, 0.0) + idle * gaze_blend
+                target = (
+                    emotional.get(axis, 0.0)
+                    + idle * gaze_blend
+                    + actions.get("gaze_x" if axis == "gaze_x" else "gaze_y", 0.0)
+                )
                 params[eye_name] = self._sv(eye_name, clamp(target, -1.0, 1.0), dt, 0.18, 0.40)
         for brow_name, key in (("BrowLeftY", "brow_l"), ("BrowRightY", "brow_r")):
             if self.profile is not None and self.profile.has(brow_name):
                 params[brow_name] = self._sv(
                     brow_name,
-                    clamp(emotional.get(key, 0.0), 0.0, 1.0),
+                    clamp(
+                        emotional.get(key, 0.0)
+                        + actions.get("brow_l" if key == "brow_l" else "brow_r", 0.0),
+                        0.0,
+                        1.0,
+                    ),
                     dt,
                     0.18,
                     0.45,
                 )
         if self.profile is not None and self.profile.has(a.brow_inner):
             params[a.brow_inner] = self._sv(
-                a.brow_inner, clamp(emotional["inner_brow"], 0, 1), dt, 0.18, 0.55
+                a.brow_inner,
+                clamp(emotional["inner_brow"] + actions.get("inner_brow", 0.0), 0, 1),
+                dt,
+                0.18,
+                0.55,
             )
 
         if mapping and mapping_strength > 0.001:

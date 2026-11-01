@@ -38,6 +38,16 @@ def _bezier(x: float, *, x1: float = 0.42, y1: float = 0.0, x2: float = 0.58, y2
     return 3.0 * (1.0 - t) ** 2 * t * y1 + 3.0 * (1.0 - t) * t**2 * y2 + t**3
 
 
+def _hold(t: float, attack: float = 0.18, hold: float = 0.62) -> float:
+    """Minimum-jerk attack, hold, minimum-jerk release."""
+    t = max(0.0, min(1.0, t))
+    if t < attack:
+        return _minjerk(t / attack)
+    if t < hold:
+        return 1.0
+    return 1.0 - _minjerk((t - hold) / max(1e-6, 1.0 - hold))
+
+
 @dataclass
 class ActionCue:
     kind: str
@@ -88,6 +98,52 @@ class ActionCue:
         if self.kind == "emphasis":
             pitch = math.sin(t * math.pi) * 2.5
             return {"pitch": pitch * amp}
+        if self.kind in ("turn_look_left", "turn_look_right"):
+            # Eyes lead, head follows with a slight roll; a little brow/smile
+            # keeps it from looking like a servo.
+            direction = -1.0 if self.kind.endswith("left") else 1.0
+            head = _hold(t, 0.16, 0.64)
+            eyes = _hold(min(1.0, t * 1.15), 0.10, 0.60)
+            settle = _hold(t, 0.30, 0.74)
+            return {
+                "yaw": 11.0 * direction * head * amp,
+                "roll": -2.0 * direction * settle * amp,
+                "pitch": 1.2 * settle * amp,
+                "gaze_x": 0.58 * direction * eyes * amp,
+                "gaze_y": 0.08 * settle * amp,
+                "brow_l": 0.10 * settle * amp,
+                "brow_r": 0.10 * settle * amp,
+                "smile": 0.08 * settle * amp,
+            }
+        if self.kind in ("shy_avoid", "shy"):
+            # Look down and away, smaller than a full turn; inner brows soften.
+            head = _hold(t, 0.20, 0.62)
+            eyes = _hold(min(1.0, t * 1.2), 0.12, 0.58)
+            return {
+                "yaw": -5.0 * head * amp,
+                "pitch": -4.0 * head * amp,
+                "roll": 3.5 * head * amp,
+                "gaze_x": -0.42 * eyes * amp,
+                "gaze_y": -0.50 * eyes * amp,
+                "inner_brow": 0.30 * head * amp,
+                "smile": 0.10 * head * amp,
+            }
+        if self.kind in ("think_side", "thinking_side"):
+            # Head tilt and side gaze, with one brow a little higher.
+            head = _hold(t, 0.22, 0.66)
+            eyes = _hold(min(1.0, t * 1.10), 0.14, 0.62)
+            return {
+                "yaw": 3.0 * head * amp,
+                "roll": 5.0 * head * amp,
+                "pitch": 1.0 * head * amp,
+                "gaze_x": 0.48 * eyes * amp,
+                "gaze_y": 0.36 * eyes * amp,
+                "brow_l": 0.16 * head * amp,
+                "smile": 0.06 * head * amp,
+            }
+        if self.kind == "look_away":
+            eyes = _hold(t, 0.12, 0.64)
+            return {"gaze_x": 0.52 * eyes * amp, "gaze_y": 0.12 * eyes * amp}
         return {}
 
     @classmethod
@@ -110,6 +166,11 @@ class ActionCue:
             "startle": 760,
             "tilt": 900,
             "thinking_tilt": 1000,
+            "turn_look_left": 1150,
+            "turn_look_right": 1150,
+            "shy_avoid": 1350,
+            "think_side": 1300,
+            "look_away": 950,
             "emphasis": 340,
         }
         duration = duration_ms or durations.get(kind, 420)
