@@ -248,8 +248,6 @@ class PerformanceMixer:
         jaw = 0.0
         funnel = 0.0
         pucker = 0.0
-        press = 0.0
-        shrug = 0.0
         phoneme = (segment.phoneme or "").lower()
         if segment.kind == "vowel":
             if segment.viseme == "O":
@@ -263,13 +261,10 @@ class PerformanceMixer:
             # Bilabials close the jaw; other consonants keep a small opening.
             jaw = 0.0 if segment.open <= 0.06 else 0.45 * mouth_open
             if phoneme in {"p", "b", "m"}:
-                press = 1.0
+                # 蒂亚 audit: MouthPressLipOpen at either polarity opens the
+                # lips instead of closing them, so do not drive it here.
                 jaw = 0.0
                 mouth_open = min(mouth_open, 0.035)
-            elif phoneme in {"f", "v"}:
-                press = 0.35
-            elif phoneme in {"s", "z", "ʃ", "ʒ", "ɕ", "ʑ", "ʂ", "ʐ", "θ", "ð"}:
-                shrug = 0.16
         if self._mouth_backend in ("continuous", "hybrid"):
             params[a.mouth_open] = self._sv(a.mouth_open, mouth_open * mouth_gain, dt, 0.025, 0.080)
         if self._mouth_backend in ("vowel", "hybrid"):
@@ -288,10 +283,6 @@ class PerformanceMixer:
                 params[a.mouth_funnel] = self._sv(a.mouth_funnel, funnel * mouth_gain, dt, 0.030, 0.090)
             if self.profile.has(a.mouth_pucker):
                 params[a.mouth_pucker] = self._sv(a.mouth_pucker, pucker * mouth_gain, dt, 0.030, 0.090)
-            if self.profile.has(a.mouth_press):
-                params[a.mouth_press] = self._sv(a.mouth_press, press * mouth_gain, dt, 0.020, 0.060)
-            if self.profile.has(a.mouth_shrug):
-                params[a.mouth_shrug] = self._sv(a.mouth_shrug, shrug * mouth_gain, dt, 0.030, 0.080)
             if self.profile.has(a.voice_silence):
                 # VTS's automatic lip-sync setup gates the mouth layer with
                 # ParamSilence. Keep it "not silent" for the whole spoken
