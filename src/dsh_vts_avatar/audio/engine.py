@@ -72,7 +72,19 @@ class AudioEngine:
 
     def _pick_device(self) -> int | None:
         if self.config.device is not None:
-            return self.config.device
+            try:
+                info = self._sd.query_devices(self.config.device)
+                if int(info.get("max_output_channels", 0)) > 0:
+                    return int(self.config.device)
+                self.log.warning(
+                    "configured audio device %s has no output channels; falling back to default",
+                    self.config.device,
+                )
+            except Exception:
+                self.log.warning(
+                    "configured audio device %s is unavailable; falling back to default",
+                    self.config.device,
+                )
         try:
             default = self._sd.default.device
             out = default[1] if isinstance(default, (tuple, list)) else default
