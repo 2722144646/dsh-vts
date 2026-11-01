@@ -165,7 +165,7 @@ class PerformanceMixer:
         at_sample: int | None = None,
         duration_ms: int | None = None,
         curve: str = "minjerk",
-    ) -> ActionCue:
+    ) -> ActionCue | None:
         cue = ActionCue.create(
             kind,
             start=int(self._last_sample if at_sample is None else at_sample),
@@ -174,6 +174,14 @@ class PerformanceMixer:
             duration_ms=duration_ms,
             curve=curve,
         )
+        # Head channels are exclusive: a nod must not start inside a head turn
+        # (or vice versa), otherwise the summed angles look like a pop.
+        if cue.channel == "head":
+            for active in self.actions:
+                if active.channel != "head" or active.finished:
+                    continue
+                if active.start < cue.start + cue.duration and active.start + active.duration > cue.start:
+                    return None
         self.actions.append(cue)
         if len(self.actions) > 24:
             self.actions = self.actions[-24:]

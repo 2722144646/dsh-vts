@@ -1,4 +1,12 @@
 from dsh_vts_avatar.performance.actions import ActionCue
+from dsh_vts_avatar.config import AvatarConfig
+from dsh_vts_avatar.performance.mixer import PerformanceMixer
+
+
+def test_overlapping_head_actions_are_suppressed():
+    mixer = PerformanceMixer(AvatarConfig(mouth_backend="continuous"), 48000)
+    assert mixer.add_action("nod", 0.5, at_sample=0) is not None
+    assert mixer.add_action("turn_look_left", 0.5, at_sample=1000) is None
 
 
 def test_turn_look_combines_head_and_eyes():

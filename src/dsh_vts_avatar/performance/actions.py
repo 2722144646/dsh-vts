@@ -58,6 +58,17 @@ class ActionCue:
     curve: str = "minjerk"
     finished: bool = False
 
+    @property
+    def channel(self) -> str:
+        if self.kind in {
+            "nod", "nod_strong", "demo_nod", "shake", "shake_head",
+            "surprise", "startle", "tilt", "thinking_tilt",
+            "turn_look_left", "turn_look_right", "shy_avoid", "think_side",
+            "emphasis",
+        }:
+            return "head"
+        return "face"
+
     def sample(self, sample: int) -> dict[str, float]:
         if sample < self.start or sample >= self.start + self.duration:
             return {}
