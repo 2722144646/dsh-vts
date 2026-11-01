@@ -97,6 +97,55 @@ class _AudioCapture:
                 pass
 
 
+class _FrameCapture:
+    """Capture NDI frames on its own thread so parameter polling stays at 20Hz."""
+
+    def __init__(self, ndi: Any, frame_dir: Path, start_time: float):
+        self.ndi = ndi
+        self.frame_dir = frame_dir
+        self.start_time = start_time
+        self.events: list[dict[str, Any]] = []
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="ndi-capture", daemon=True)
+        self._count = 0
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def _run(self) -> None:
+        next_at = time.perf_counter()
+        while not self._stop.is_set():
+            try:
+                frame, _ = self.ndi.capture(timeout_ms=120)
+            except Exception:
+                frame = None
+            if frame is not None:
+                self._count += 1
+                name = f"frame_{self._count:05d}.jpg"
+                ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+                if ok:
+                    # cv2.imwrite does not reliably handle non-ASCII Windows
+                    # paths; write the encoded JPEG through pathlib instead.
+                    (self.frame_dir / name).write_bytes(encoded.tobytes())
+                    self.events.append(
+                        {
+                            "t": round(time.perf_counter() - self.start_time, 4),
+                            "file": f"frames/{name}",
+                        }
+                    )
+            next_at += 1.0 / 30.0
+            delay = next_at - time.perf_counter()
+            if delay < 0:
+                next_at = time.perf_counter()
+                delay = 0
+            time.sleep(delay)
+
+    def stop(self) -> list[dict[str, Any]]:
+        self._stop.set()
+        self._thread.join(timeout=2.0)
+        return self.events
+
+
 async def _sample(client: VTSClient) -> tuple[dict[str, float], dict[str, float]]:
     inputs = await client.list_input_params()
     live = await client.list_live2d_params()
@@ -126,6 +175,7 @@ async def record_expression(
     params_fh = None
     frames_fh = None
     audio = None
+    frame_capture = None
     frame_count = 0
     if session is not None:
         session.mkdir(parents=True, exist_ok=True)
@@ -137,6 +187,9 @@ async def record_expression(
             audio = _AudioCapture(session / "audio.wav", audio_device)
             audio.start()
     session_start = time.perf_counter()
+    if ndi is not None and frame_dir is not None:
+        frame_capture = _FrameCapture(ndi, frame_dir, session_start)
+        frame_capture.start()
 
     def write_sample(phase: str, inputs: dict[str, float], live: dict[str, float]) -> None:
         if params_fh is not None:
@@ -161,36 +214,11 @@ async def record_expression(
     baseline_inputs: list[dict[str, float]] = []
     baseline_live: list[dict[str, float]] = []
 
-    async def capture_frame() -> None:
-        nonlocal frame_count
-        if ndi is None or frame_dir is None or frames_fh is None:
-            return
-        try:
-            frame, _metrics = await asyncio.to_thread(ndi.capture, timeout_ms=60)
-        except Exception:
-            return
-        if frame is None:
-            return
-        frame_count += 1
-        name = f"frame_{frame_count:05d}.jpg"
-        cv2.imwrite(str(frame_dir / name), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
-        frames_fh.write(
-            json.dumps(
-                {
-                    "t": round(time.perf_counter() - session_start, 4),
-                    "file": f"frames/{name}",
-                },
-                ensure_ascii=False,
-            )
-            + "\n"
-        )
-
     for _ in range(max(1, math.ceil(baseline_s * hz))):
         i, l = await _sample(client)
         baseline_inputs.append(i)
         baseline_live.append(l)
         write_sample("baseline", i, l)
-        await capture_frame()
         await asyncio.sleep(period)
 
     def average(rows: list[dict[str, float]]) -> dict[str, float]:
@@ -212,10 +240,14 @@ async def record_expression(
         samples_inputs.append(i)
         samples_live.append(l)
         write_sample("expression", i, l)
-        await capture_frame()
         await asyncio.sleep(period)
     if on_done is not None:
         on_done()
+    frame_events = frame_capture.stop() if frame_capture is not None else []
+    frame_count = len(frame_events)
+    if frames_fh is not None:
+        for event in frame_events:
+            frames_fh.write(json.dumps(event, ensure_ascii=False) + "\n")
 
     def summarize(
         base: dict[str, float],
