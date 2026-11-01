@@ -474,6 +474,11 @@ class AvatarEngine:
                 self.mixer.add_action("emphasis", 0.50, at_sample=start)
             elif self._segment_count % 3 == 0:
                 self.mixer.add_action("nod", 0.35, at_sample=start)
+            elif self._segment_count % 4 == 0:
+                # A slow look to the side at a phrase boundary, with the eyes
+                # leading the head. This is a small cue, not a constant scan.
+                side = "turn_look_left" if (self._segment_count // 4) % 2 else "turn_look_right"
+                self.mixer.add_action(side, 0.28, at_sample=start)
 
     # -- control loop ------------------------------------------------------
 
