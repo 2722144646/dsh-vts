@@ -296,7 +296,7 @@ export function apply(ctx, config = {}) {
           properties: {
             name: {
               type: 'string',
-              enum: ['happy', 'sad', 'angry', 'surprised', 'thinking', 'shy', 'calm', 'neutral'],
+              enum: ['happy', 'sad', 'angry', 'surprised', 'thinking', 'shy', 'wronged', 'calm', 'neutral'],
               description: 'Expression preset.',
             },
             intensity: {

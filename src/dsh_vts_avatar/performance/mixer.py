@@ -328,6 +328,7 @@ class PerformanceMixer:
                 "EyeRightY": "EyeRightY",
                 "BrowLeftY": "BrowLeftY",
                 "BrowRightY": "BrowRightY",
+                "CheekPuff": "CheekPuff",
             }
             for param, key in direct.items():
                 if key not in mapping:
