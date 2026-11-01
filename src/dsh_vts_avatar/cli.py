@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import datetime
 import json
 import logging
 from pathlib import Path
@@ -77,10 +78,26 @@ async def _cmd_record(args) -> int:
     ensure_dirs(cfg)
     client = VTSClient(cfg.vts)
     await client.connect()
+    ndi = None
+    session = None
     try:
         model = await client.current_model()
         model_id = str(model.get("modelID", ""))
         profile = ModelProfile.load(profile_path(cfg.profile_dir, model_id))
+        if args.ndi:
+            ndi = NDICapture(source_hint=cfg.ndi.source, snapshot_dir=cfg.snapshot_dir)
+            if not ndi.open(wait_ms=4000):
+                print("NDI source not found; continuing without frames.", file=sys.stderr)
+                ndi = None
+        if args.session_root:
+            root = Path(args.session_root)
+            if not root.is_absolute():
+                root = cfg.root / root
+        else:
+            root = cfg.root / "data" / "demos"
+        safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in args.name)
+        session = root / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{safe or 'expression'}"
+        print(f"Session: {session}", flush=True)
         print("Read-only recording. Keep neutral until the voice cue, then do the expression.", flush=True)
 
         def speak(text: str) -> None:
@@ -113,6 +130,9 @@ async def _cmd_record(args) -> int:
             duration_s=args.seconds,
             on_start=start_cue,
             on_done=done_cue,
+            ndi=ndi,
+            session_dir=session,
+            audio_device=args.audio_device if args.audio else None,
         )
         profile.learned_expressions[args.name] = summary
         direct = {
@@ -125,6 +145,8 @@ async def _cmd_record(args) -> int:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0
     finally:
+        if ndi is not None:
+            ndi.close()
         await client.close()
 
 
@@ -184,6 +206,10 @@ def build_parser() -> argparse.ArgumentParser:
     record = sub.add_parser("record", help="read-only capture of a user-performed expression")
     record.add_argument("--name", required=True, help="learned expression name")
     record.add_argument("--seconds", type=float, default=4.0)
+    record.add_argument("--ndi", action="store_true", help="also save synchronized NDI frames")
+    record.add_argument("--audio", action="store_true", help="also save microphone audio")
+    record.add_argument("--audio-device", type=int, default=None)
+    record.add_argument("--session-root", default="", help="default: data/demos")
 
     ndi = sub.add_parser("ndi", help="list or capture the VTS NDI feed")
     ndi.add_argument("--list", action="store_true")
