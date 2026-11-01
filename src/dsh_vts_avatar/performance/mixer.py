@@ -35,6 +35,21 @@ def _smooth(current: float, target: float, dt: float, attack: float, release: fl
     return current + (target - current) * alpha
 
 
+class GazeController:
+    """Slow, bounded idle gaze. Expression gaze overrides it."""
+
+    def __init__(self, seed: int | None = None):
+        rng = random.Random(seed)
+        self._phase = [rng.uniform(0, math.tau) for _ in range(4)]
+        self._start = time.perf_counter()
+
+    def update(self, now: float) -> tuple[float, float]:
+        t = max(0.0, now - self._start)
+        x = 0.20 * math.sin(t * 0.23 + self._phase[0]) + 0.06 * math.sin(t * 0.71 + self._phase[1])
+        y = 0.11 * math.sin(t * 0.19 + self._phase[2]) + 0.04 * math.sin(t * 0.53 + self._phase[3])
+        return clamp(x, -0.45, 0.45), clamp(y, -0.30, 0.30)
+
+
 class BlinkController:
     """Self-owned blink. VTS auto-blink should be disabled for this to be clean."""
 
@@ -83,6 +98,7 @@ class PerformanceMixer:
         self._started = self._last_time
         self._last_sample = 0
         self._blink = BlinkController(self.avatar.blink_per_min)
+        self._gaze = GazeController()
         self._values: dict[str, float] = {}
         self._vel: dict[str, float] = {}
         self._state_bias = {"x": 0.0, "y": 0.0, "z": 0.0}
@@ -125,6 +141,19 @@ class PerformanceMixer:
         return float(default)
 
     def set_emotion(self, name: str, intensity: float = 0.7) -> None:
+        # If the user demonstrated a custom expression under a semantic name,
+        # prefer that recording over the generic preset. This is the bridge
+        # between the demo dataset and live expression selection.
+        alias = {
+            "happy": "开心",
+            "sad": "难过",
+            "surprised": "惊讶",
+            "thinking": "思考",
+            "shy": "害羞",
+            "wronged": "委屈",
+        }.get((name or "").lower())
+        if alias and self.profile is not None and alias in self.profile.expression_map:
+            name = alias
         self.emotion.set(name, intensity)
 
     def add_action(
@@ -288,16 +317,16 @@ class PerformanceMixer:
         params["FaceAngry"] = self._sv("FaceAngry", clamp(angry, 0, 1), dt, 0.20, 0.60)
         # Looking aside is what makes "thinking" read as thinking instead of
         # sad. The values are expression targets already blended by the mixer.
+        idle_gaze_x, idle_gaze_y = self._gaze.update(now)
+        gaze_blend = 1.0 - clamp(
+            self.emotion.preset_intensity * self._gain("expression_gain", 1.0), 0.0, 1.0
+        ) * 0.85
         for eye_name in ("EyeLeftX", "EyeRightX", "EyeLeftY", "EyeRightY"):
             if self.profile is not None and self.profile.has(eye_name):
                 axis = "gaze_x" if eye_name.endswith("X") else "gaze_y"
-                params[eye_name] = self._sv(
-                    eye_name,
-                    clamp(emotional.get(axis, 0.0), -1.0, 1.0),
-                    dt,
-                    0.18,
-                    0.40,
-                )
+                idle = idle_gaze_x if axis == "gaze_x" else idle_gaze_y
+                target = emotional.get(axis, 0.0) + idle * gaze_blend
+                params[eye_name] = self._sv(eye_name, clamp(target, -1.0, 1.0), dt, 0.18, 0.40)
         for brow_name, key in (("BrowLeftY", "brow_l"), ("BrowRightY", "brow_r")):
             if self.profile is not None and self.profile.has(brow_name):
                 params[brow_name] = self._sv(

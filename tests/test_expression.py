@@ -27,11 +27,16 @@ def test_emotion_preset_blends_into_mixer_targets():
     assert surprised["open"] > sad["open"]
 
 
-def test_emotion_set_keeps_preset_name():
-    state = EmotionState()
-    state.set("angry", 0.8)
-    assert state.preset == "angry"
-    assert state.target_preset_intensity == 0.8
+def test_learned_expression_alias_is_used():
+    from dsh_vts_avatar.vts.profile import ModelProfile
+
+    profile = ModelProfile(
+        model_id="t",
+        expression_map={"开心": {"MouthSmile": 1.0, "EyeOpenLeft": 1.0, "EyeOpenRight": 1.0}},
+    )
+    mixer = PerformanceMixer(AvatarConfig(mouth_backend="continuous"), 48000, profile=profile)
+    mixer.set_emotion("happy", 1.0)
+    assert mixer.emotion.preset == "开心"
 
 
 def test_expression_gain_is_read_from_model_profile():
