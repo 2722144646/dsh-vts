@@ -286,6 +286,54 @@ export function apply(ctx, config = {}) {
         },
       }),
 
+      ctx.tools.register({
+        name: 'vts_avatar_emote',
+        description:
+          'Set the avatar expression explicitly: happy, sad, angry, surprised, thinking, shy, calm, or neutral. ' +
+          'Use this as a side channel when the reply emotion is known and should not wait for keyword detection.',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              enum: ['happy', 'sad', 'angry', 'surprised', 'thinking', 'shy', 'calm', 'neutral'],
+              description: 'Expression preset.',
+            },
+            intensity: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              description: 'Expression intensity; 0.7 is a good default.',
+            },
+          },
+          required: ['name'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              ok: { type: 'boolean' },
+              error: { type: 'string' },
+            },
+          },
+          render: (_args, value) => [
+            {
+              type: 'text',
+              text: value?.ok ? `Avatar emotion set: ${value.name}` : `Avatar emotion failed: ${value?.error}`,
+            },
+          ],
+        },
+        async execute(args) {
+          const name = String(args?.name ?? 'neutral').trim().toLowerCase();
+          const intensity = Number(args?.intensity ?? 0.7);
+          const sent = client.send({ type: 'emotion', name, intensity });
+          if (!sent) return { ok: false, error: 'bridge is not connected' };
+          return { ok: true, name, intensity };
+        },
+      }),
+
       ctx.on('agent/assistant-stream', (payload) => {
         const agent = payload?.agent;
         const frame = payload?.frame;

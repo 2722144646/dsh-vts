@@ -38,6 +38,7 @@ class ModelProfile:
     input_params: dict[str, ParameterInfo] = field(default_factory=dict)
     live2d_params: dict[str, ParameterInfo] = field(default_factory=dict)
     probes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    range_tests: dict[str, dict[str, Any]] = field(default_factory=dict)
     mouth_backend: str = "auto"
     # Per-model tuning survives model switches. Keys match AvatarConfig fields,
     # e.g. head_gain, mouth_gain, jaw_gain, expression_gain.
@@ -122,6 +123,7 @@ class ModelProfile:
             model_id=str(raw.get("model", {}).get("modelID", "")),
             mouth_backend=str(raw.get("mouth_backend", "auto")),
             tuning={str(k): float(v) for k, v in (raw.get("tuning") or {}).items()},
+            range_tests=dict(raw.get("range_tests") or {}),
         )
         for item in raw.get("input_parameters", []):
             info = ParameterInfo.from_vts(item)
@@ -165,6 +167,7 @@ class ModelProfile:
                         for p in self.live2d_params.values()
                     ],
                     "probes": self.probes,
+                    "range_tests": self.range_tests,
                     "driven_live2d": self.driven_live2d,
                 },
                 ensure_ascii=False,

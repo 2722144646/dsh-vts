@@ -21,6 +21,7 @@ from ..tts.timeline import Timeline
 from ..vts.client import VTSClient, VTSError
 from ..vts.profile import ModelProfile, load_for_model, profile_path
 from .segmentation import Segmenter
+from .text_filter import SpeechTextFilter
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class AvatarEngine:
         self.mixer: PerformanceMixer | None = None
         self.vts = VTSClient(config.vts)
         self.segmenter = Segmenter()
+        self.speech_filter = SpeechTextFilter()
         self.segmenter_gesture_rate = config.avatar.gesture_rate
         self.timeline: Timeline | None = None
         self._parts: list[Timeline] = []
@@ -289,6 +291,7 @@ class AvatarEngine:
         await self.cancel()
         self.utterance_id = utterance_id or f"utt-{int(time.time() * 1000)}"
         self.segmenter = Segmenter()
+        self.speech_filter.reset()
         self._affect_buffer = ""
         self._segment_count = 0
         self._utterance_open = True
@@ -306,12 +309,19 @@ class AvatarEngine:
             if affect:
                 self.mixer.set_emotion(*affect)
         clean = strip_emotion_tags(text)
+        clean = self.speech_filter.feed(clean)
+        if not clean:
+            return
         segments = self.segmenter.feed(clean)
         for segment in segments:
             self._enqueue(segment)
 
     async def end_utterance(self) -> None:
         self._utterance_open = False
+        tail = self.speech_filter.flush()
+        if tail:
+            for segment in self.segmenter.feed(tail):
+                self._enqueue(segment)
         for segment in self.segmenter.flush():
             self._enqueue(segment)
         if self._queue is not None and self._queue.empty() and self.timeline is None:
@@ -321,6 +331,10 @@ class AvatarEngine:
     def _enqueue(self, segment: str) -> None:
         segment = segment.strip()
         if not segment or self._queue is None:
+            return
+        # Do not let a stray brace, fence or punctuation-only fragment reach
+        # Piper; it produces no audio and used to poison the speech queue.
+        if not any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in segment):
             return
         try:
             self._queue.put_nowait(segment)
@@ -361,6 +375,10 @@ class AvatarEngine:
     def add_action(self, kind: str, intensity: float = 0.7) -> None:
         if self.mixer is not None:
             self.mixer.add_action(kind, intensity)
+
+    def set_emotion(self, name: str, intensity: float = 0.7) -> None:
+        if self.mixer is not None:
+            self.mixer.set_emotion(name, intensity)
 
     def demo_head(self, *, curve: str = "minjerk", intensity: float = 0.5, duration_ms: int = 900) -> bool:
         if self.clock is None or self.mixer is None or self.tts is None:

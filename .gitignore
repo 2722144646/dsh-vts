@@ -17,6 +17,8 @@ data/vts_token.json
 data/contract.json
 data/profiles/
 data/ndi/
+data/recording/
+data/expression_shots/
 data/*.log
 *.log
 

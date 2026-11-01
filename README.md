@@ -81,7 +81,8 @@ uv pip install --python .venv\Scripts\python.exe -e .
 可用工具：
 
 - `vts_avatar_look`：抓一张 NDI 当前画面，返回路径和运动指标；
-- `vts_avatar_say`：让角色念一句测试文本。
+- `vts_avatar_say`：让角色念一句测试文本；
+- `vts_avatar_emote`：显式设置表情（happy/sad/angry/surprised/thinking/shy/calm/neutral）。
 
 ## 不提交的内容
 
@@ -94,5 +95,5 @@ uv pip install --python .venv\Scripts\python.exe -e .
 
 ## 状态
 
-当前是可用基础版：语音、嘴型、最小 jerk 头部、接管/离开淡入淡出、NDI 抓图、dsh 插件。  
-表情精细度、完整 VB 参数层、身体/眼神/动作队列、本地 8B 待机导演仍在计划中。
+当前是可用基础版：语音、嘴型、最小 jerk 头部、接管/离开淡入淡出、NDI 抓图、dsh 插件、6 个表情预设。  
+自动语义表情、完整 VB 参数层、身体/眼神/动作队列、本地 8B 待机导演仍在计划中。
