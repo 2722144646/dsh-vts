@@ -9,10 +9,16 @@ custom expression hint.
 from __future__ import annotations
 
 import asyncio
+import json
 import math
+import threading
 import time
+import wave
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable
+
+import cv2
 
 from ..vts.client import VTSClient
 
@@ -48,6 +54,49 @@ def _live_values(raw: dict[str, Any]) -> dict[str, float]:
     return out
 
 
+class _AudioCapture:
+    def __init__(self, path: Path, device: int | None = None):
+        self.path = path
+        self.device = device
+        self.frames: list[bytes] = []
+        self.stream = None
+
+    def start(self) -> None:
+        try:
+            import sounddevice as sd
+
+            self.stream = sd.InputStream(
+                samplerate=48000,
+                channels=1,
+                dtype="int16",
+                device=self.device,
+                callback=self._callback,
+            )
+            self.stream.start()
+        except Exception:
+            self.stream = None
+
+    def _callback(self, indata, frames, time_info, status) -> None:
+        self.frames.append(bytes(indata))
+
+    def stop(self) -> None:
+        if self.stream is not None:
+            try:
+                self.stream.stop()
+                self.stream.close()
+            except Exception:
+                pass
+        if self.frames:
+            try:
+                with wave.open(str(self.path), "wb") as fh:
+                    fh.setnchannels(1)
+                    fh.setsampwidth(2)
+                    fh.setframerate(48000)
+                    fh.writeframes(b"".join(self.frames))
+            except Exception:
+                pass
+
+
 async def _sample(client: VTSClient) -> tuple[dict[str, float], dict[str, float]]:
     inputs = await client.list_input_params()
     live = await client.list_live2d_params()
@@ -63,11 +112,46 @@ async def record_expression(
     hz: float = 20.0,
     on_start: Callable[[], None] | None = None,
     on_done: Callable[[], None] | None = None,
+    ndi: Any | None = None,
+    session_dir: Path | None = None,
+    audio_device: int | None = None,
 ) -> dict[str, Any]:
     duration_s = max(1.0, min(15.0, float(duration_s)))
     hz = max(5.0, min(30.0, float(hz)))
     model = await client.current_model()
     period = 1.0 / hz
+
+    session = Path(session_dir) if session_dir is not None else None
+    frame_dir = None
+    params_fh = None
+    frames_fh = None
+    audio = None
+    frame_count = 0
+    if session is not None:
+        session.mkdir(parents=True, exist_ok=True)
+        frame_dir = session / "frames"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        params_fh = (session / "params.jsonl").open("w", encoding="utf-8")
+        frames_fh = (session / "frames.jsonl").open("w", encoding="utf-8")
+        if audio_device is not None:
+            audio = _AudioCapture(session / "audio.wav", audio_device)
+            audio.start()
+    session_start = time.perf_counter()
+
+    def write_sample(phase: str, inputs: dict[str, float], live: dict[str, float]) -> None:
+        if params_fh is not None:
+            params_fh.write(
+                json.dumps(
+                    {
+                        "t": round(time.perf_counter() - session_start, 4),
+                        "phase": phase,
+                        "input": inputs,
+                        "live2d": live,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
 
     # VTS keeps the last injected value after a plugin stops writing. Send one
     # neutral frame so the baseline is not polluted by the previous expression,
@@ -76,10 +160,37 @@ async def record_expression(
     await asyncio.sleep(1.0)
     baseline_inputs: list[dict[str, float]] = []
     baseline_live: list[dict[str, float]] = []
+
+    async def capture_frame() -> None:
+        nonlocal frame_count
+        if ndi is None or frame_dir is None or frames_fh is None:
+            return
+        try:
+            frame, _metrics = await asyncio.to_thread(ndi.capture, timeout_ms=60)
+        except Exception:
+            return
+        if frame is None:
+            return
+        frame_count += 1
+        name = f"frame_{frame_count:05d}.jpg"
+        cv2.imwrite(str(frame_dir / name), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        frames_fh.write(
+            json.dumps(
+                {
+                    "t": round(time.perf_counter() - session_start, 4),
+                    "file": f"frames/{name}",
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+
     for _ in range(max(1, math.ceil(baseline_s * hz))):
         i, l = await _sample(client)
         baseline_inputs.append(i)
         baseline_live.append(l)
+        write_sample("baseline", i, l)
+        await capture_frame()
         await asyncio.sleep(period)
 
     def average(rows: list[dict[str, float]]) -> dict[str, float]:
@@ -100,6 +211,8 @@ async def record_expression(
         i, l = await _sample(client)
         samples_inputs.append(i)
         samples_live.append(l)
+        write_sample("expression", i, l)
+        await capture_frame()
         await asyncio.sleep(period)
     if on_done is not None:
         on_done()
@@ -131,7 +244,7 @@ async def record_expression(
 
     inputs = summarize(base_in, samples_inputs)
     live = summarize(base_live, samples_live, threshold=0.01)
-    return {
+    summary = {
         "name": name,
         "created": datetime.now(timezone.utc).isoformat(),
         "model_id": str(model.get("modelID", "")),
@@ -144,3 +257,17 @@ async def record_expression(
         "top_inputs": list(inputs)[:12],
         "top_live2d": list(live)[:12],
     }
+    if audio is not None:
+        audio.stop()
+    for fh in (params_fh, frames_fh):
+        if fh is not None:
+            fh.close()
+    if session is not None:
+        summary["session_dir"] = str(session)
+        summary["frames"] = frame_count
+        summary["audio"] = bool(audio and audio.frames)
+        (session / "manifest.json").write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    return summary

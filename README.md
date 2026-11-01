@@ -74,7 +74,13 @@ uv pip install --python .venv\Scripts\python.exe -e .
 .venv\Scripts\python.exe -m dsh_vts_avatar --config dsh-vts-avatar\config.toml record --name "委屈2" --seconds 5
 ```
 
-`record` 会暂停所有参数写入，只读取 VTS 的输入参数和 Live2D 参数；用户在 VTS 里做表情，结束后把 delta、范围和峰值保存到当前模型档案，并生成一个可直接用名字调用的表达式映射。
+同步采集参数 + NDI 帧（可选麦克风）：
+
+```powershell
+.venv\Scripts\python.exe -m dsh_vts_avatar --config dsh-vts-avatar\config.toml record --name "委屈2" --seconds 5 --ndi --audio
+```
+
+`record` 会先发一帧中性参数，然后暂停所有写入，只读取 VTS 的输入参数和 Live2D 参数；用户听到语音提示后做表情。结束后把 session 保存到 `data/demos/<时间>_<名字>/`：`params.jsonl`、`frames/`、`frames.jsonl`、可选 `audio.wav`、`manifest.json`。
 
 桥接 WebSocket：`ws://127.0.0.1:8765`。
 
