@@ -7,6 +7,9 @@ class FakeVTS:
     def __init__(self):
         self.calls = 0
 
+    async def inject(self, params):
+        return None
+
     async def current_model(self):
         return {"modelID": "fake", "modelName": "Fake"}
 
