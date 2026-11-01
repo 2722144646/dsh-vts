@@ -19,6 +19,7 @@ data/profiles/
 data/ndi/
 data/recording/
 data/expression_shots/
+data/demos/
 data/*.log
 *.log
 

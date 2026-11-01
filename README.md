@@ -97,6 +97,7 @@ uv pip install --python .venv\Scripts\python.exe -e .
 - `data/ndi/`：本地截图；
 - `data/contract.json`：旧版单模型探测结果（兼容用）；
 - `data/profiles/`：**每个模型独立**的参数/校准档案，例如 `data/profiles/1f951c3d0c67414097c15b241322c75c.json`；
+- `data/demos/`：用户示范的原始 session（参数、NDI 帧、音频），留给以后 8B 学习；不提交；
 - `.venv/`、缓存、日志。
 
 ## 状态
