@@ -117,10 +117,22 @@ async def _cmd_record(args) -> int:
                 pass
 
         def start_cue() -> None:
+            try:
+                import winsound
+
+                winsound.Beep(1000, 120)
+            except Exception:
+                pass
             speak(f"开始，{args.name}")
             print("START", flush=True)
 
         def done_cue() -> None:
+            try:
+                import winsound
+
+                winsound.Beep(660, 120)
+            except Exception:
+                pass
             speak("停")
             print("DONE", flush=True)
 

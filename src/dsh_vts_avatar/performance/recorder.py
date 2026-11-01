@@ -295,8 +295,14 @@ async def record_expression(
 
     base_in = average(baseline_inputs)
     base_live = average(baseline_live)
+    cue_t = None
     if on_start is not None:
         on_start()
+        cue_t = round(time.perf_counter() - session_start, 4)
+        if params_fh is not None:
+            params_fh.write(
+                json.dumps({"t": cue_t, "phase": "cue"}, ensure_ascii=False) + "\n"
+            )
     samples_inputs: list[dict[str, float]] = []
     samples_live: list[dict[str, float]] = []
     started = time.perf_counter()
@@ -358,6 +364,7 @@ async def record_expression(
         "live2d_deltas": live,
         "top_inputs": list(inputs)[:12],
         "top_live2d": list(live)[:12],
+        "cue_t": cue_t,
     }
     if audio is not None:
         audio.stop()
