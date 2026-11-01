@@ -186,7 +186,7 @@ def _frame_worker(
                             "file": f"frames/{name}",
                         }
                     )
-            next_at += 1.0 / 30.0
+            next_at += 1.0 / 15.0
             delay = next_at - time.perf_counter()
             if delay < 0:
                 next_at = time.perf_counter()
@@ -352,7 +352,7 @@ async def record_expression(
         "duration_s": round(duration_s, 2),
         "samples": len(samples_inputs),
         "live2d_samples": len(samples_live),
-        "frame_fps": 30,
+        "frame_fps": 15,
         "baseline_inputs": {k: round(v, 5) for k, v in base_in.items()},
         "input_deltas": inputs,
         "live2d_deltas": live,
@@ -373,3 +373,4 @@ async def record_expression(
             encoding="utf-8",
         )
     return summary
+
