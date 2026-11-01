@@ -3,7 +3,7 @@
 
 [vts]
 host = "127.0.0.1"
-port = 8001
+port = 8002
 plugin_name = "dsh VTS Avatar"
 plugin_developer = "dsh"
 token_path = "data/vts_token.json"
@@ -54,6 +54,9 @@ mouth_smile = "MouthSmile"
 jaw_open = "JawOpen"
 mouth_funnel = "MouthFunnel"
 mouth_pucker = "MouthPucker"
+mouth_press = "MouthPressLipOpen"
+mouth_shrug = "MouthShrug"
+mouth_x = "MouthX"
 # VTS auto-lip-sync "silence" gate: 0 while speaking, 1 during pauses.
 voice_silence = "VoiceSilence"
 # Sad / concerned inner brows, optional; filtered by the model profile.
