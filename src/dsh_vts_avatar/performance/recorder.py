@@ -224,6 +224,7 @@ async def record_expression(
     live_every: int = 2,
     on_start: Callable[[], None] | None = None,
     on_done: Callable[[], None] | None = None,
+    on_session_start: Callable[[], None] | None = None,
     ndi: Any | None = None,
     session_dir: Path | None = None,
     audio_device: int | None = None,
@@ -250,6 +251,10 @@ async def record_expression(
             audio = _AudioCapture(session / "audio.wav", audio_device)
             audio.start()
     session_start = time.perf_counter()
+    if on_session_start is not None:
+        on_session_start()
+    if params_fh is not None:
+        params_fh.write(json.dumps({"t": 0.0, "phase": "session"}, ensure_ascii=False) + "\n")
     if ndi is not None and frame_dir is not None:
         frame_capture = _FrameCapture(ndi, frame_dir, session_start)
         frame_capture.start()
@@ -317,6 +322,7 @@ async def record_expression(
         await asyncio.sleep(period)
     if on_done is not None:
         on_done()
+    done_t = round(time.perf_counter() - session_start, 4)
     frame_events = frame_capture.stop() if frame_capture is not None else []
     frame_count = len(frame_events)
     if frames_fh is not None:
@@ -365,6 +371,7 @@ async def record_expression(
         "top_inputs": list(inputs)[:12],
         "top_live2d": list(live)[:12],
         "cue_t": cue_t,
+        "done_t": done_t,
     }
     if audio is not None:
         audio.stop()

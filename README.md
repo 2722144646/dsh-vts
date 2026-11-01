@@ -81,7 +81,7 @@ uv pip install --python .venv\Scripts\python.exe -e .
 ```
 
 OBS 录制工作流：OBS 录 NDI 30/60fps + 桌面音频，Python 只跑参数录制（不加 `--ndi`）。  
-开始时会先响一声 1kHz 提示音，再说“开始，表情名”，参数文件里会写入 `phase: "cue"` 和 `cue_t`；后期用 OBS 音频里的提示音对齐视频和参数。
+开始时会先响 700Hz 会话标记；基线结束后响 1kHz 提示音并说“开始，表情名”；结束时响 660Hz 并说“停”。参数文件记录 `phase: "session"`、`phase: "cue"`、`cue_t`、`done_t`；后期用三个音频标记做起点、表情起点和结束点对齐，并可检查漂移。
 
 `record` 会先发一帧中性参数，然后暂停所有写入，只读取 VTS 的输入参数和 Live2D 参数；用户听到语音提示后做表情。结束后把 session 保存到 `data/demos/<时间>_<名字>/`：`params.jsonl`、`frames/`、`frames.jsonl`、可选 `audio.wav`、`manifest.json`。
 
