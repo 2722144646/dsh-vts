@@ -116,6 +116,15 @@ async def _cmd_record(args) -> int:
             except Exception:
                 pass
 
+        def session_cue() -> None:
+            try:
+                import winsound
+
+                winsound.Beep(700, 120)
+            except Exception:
+                pass
+            print("SESSION", flush=True)
+
         def start_cue() -> None:
             try:
                 import winsound
@@ -142,6 +151,7 @@ async def _cmd_record(args) -> int:
             duration_s=args.seconds,
             on_start=start_cue,
             on_done=done_cue,
+            on_session_start=session_cue,
             ndi=ndi,
             session_dir=session,
             audio_device=args.audio_device if args.audio else None,
