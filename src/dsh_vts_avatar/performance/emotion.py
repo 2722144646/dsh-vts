@@ -84,16 +84,16 @@ class EmotionState:
 # continuous valence/arousal baseline; this is what makes "sad" different from
 # "low-energy happy" and "surprised" different from "excited".
 EXPRESSION_TARGETS: dict[str, dict[str, float]] = {
-    "happy": {"smile": 0.92, "eye": 0.95, "brow": 0.28, "angry": 0.0, "inner_brow": 0.05, "open": 0.04},
-    "joy": {"smile": 0.98, "eye": 0.97, "brow": 0.35, "angry": 0.0, "inner_brow": 0.04, "open": 0.06},
-    "excited": {"smile": 0.96, "eye": 0.98, "brow": 0.55, "angry": 0.0, "inner_brow": 0.04, "open": 0.16},
-    "sad": {"smile": 0.03, "eye": 0.74, "brow": 0.02, "angry": 0.0, "inner_brow": 0.88, "open": 0.02},
-    "angry": {"smile": 0.02, "eye": 0.84, "brow": 0.05, "angry": 0.88, "inner_brow": 0.22, "open": 0.03},
-    "surprised": {"smile": 0.18, "eye": 1.0, "brow": 0.92, "angry": 0.0, "inner_brow": 0.10, "open": 0.55},
-    "surprise": {"smile": 0.18, "eye": 1.0, "brow": 0.92, "angry": 0.0, "inner_brow": 0.10, "open": 0.55},
-    "thinking": {"smile": 0.08, "eye": 0.86, "brow": 0.36, "angry": 0.0, "inner_brow": 0.16, "open": 0.02},
-    "curious": {"smile": 0.24, "eye": 0.94, "brow": 0.52, "angry": 0.0, "inner_brow": 0.12, "open": 0.08},
-    "shy": {"smile": 0.52, "eye": 0.82, "brow": 0.18, "angry": 0.0, "inner_brow": 0.26, "open": 0.02},
+    "happy": {"smile": 0.95, "eye": 0.90, "brow": 0.30, "angry": 0.0, "inner_brow": 0.04, "open": 0.04},
+    "joy": {"smile": 0.99, "eye": 0.94, "brow": 0.35, "angry": 0.0, "inner_brow": 0.03, "open": 0.06},
+    "excited": {"smile": 0.97, "eye": 0.96, "brow": 0.55, "angry": 0.0, "inner_brow": 0.03, "open": 0.18},
+    "sad": {"smile": 0.0, "eye": 0.45, "brow": 0.02, "angry": 0.0, "inner_brow": 1.0, "open": 0.0, "gaze_x": 0.0, "gaze_y": -0.35, "brow_l": 0.18, "brow_r": 0.18},
+    "angry": {"smile": 0.0, "eye": 0.52, "brow": 0.02, "angry": 0.95, "inner_brow": 0.30, "open": 0.02, "gaze_x": 0.0, "gaze_y": 0.10},
+    "surprised": {"smile": 0.16, "eye": 1.0, "brow": 0.96, "angry": 0.0, "inner_brow": 0.08, "open": 0.70},
+    "surprise": {"smile": 0.16, "eye": 1.0, "brow": 0.96, "angry": 0.0, "inner_brow": 0.08, "open": 0.70},
+    "thinking": {"smile": 0.16, "eye": 0.88, "brow": 0.45, "angry": 0.0, "inner_brow": 0.08, "open": 0.02, "gaze_x": 0.55, "gaze_y": 0.18, "brow_l": 0.72, "brow_r": 0.20},
+    "curious": {"smile": 0.24, "eye": 0.94, "brow": 0.52, "angry": 0.0, "inner_brow": 0.10, "open": 0.08},
+    "shy": {"smile": 0.58, "eye": 0.62, "brow": 0.16, "angry": 0.0, "inner_brow": 0.34, "open": 0.02, "gaze_x": -0.35, "gaze_y": 0.38, "brow_l": 0.24, "brow_r": 0.24},
     "neutral": {"smile": 0.14, "eye": 0.93, "brow": 0.10, "angry": 0.0, "inner_brow": 0.04, "open": 0.02},
     "calm": {"smile": 0.20, "eye": 0.90, "brow": 0.08, "angry": 0.0, "inner_brow": 0.06, "open": 0.02},
 }
@@ -102,12 +102,12 @@ EXPRESSION_HEAD: dict[str, dict[str, float]] = {
     "happy": {"yaw": 0.0, "pitch": -0.6, "roll": 1.2},
     "joy": {"yaw": 0.0, "pitch": -0.8, "roll": 1.8},
     "excited": {"yaw": 0.0, "pitch": -0.4, "roll": 2.4},
-    "sad": {"yaw": 0.0, "pitch": -3.2, "roll": -1.6},
-    "angry": {"yaw": 0.0, "pitch": 1.2, "roll": -2.6},
-    "surprised": {"yaw": 0.0, "pitch": -2.0, "roll": 0.0},
-    "thinking": {"yaw": 1.0, "pitch": 0.8, "roll": 4.2},
+    "sad": {"yaw": 0.0, "pitch": -5.0, "roll": -2.2},
+    "angry": {"yaw": 0.0, "pitch": 2.0, "roll": -4.0},
+    "surprised": {"yaw": 0.0, "pitch": -3.0, "roll": 0.0},
+    "thinking": {"yaw": 1.5, "pitch": 2.0, "roll": 6.0},
     "curious": {"yaw": 1.2, "pitch": -0.6, "roll": 3.0},
-    "shy": {"yaw": -0.8, "pitch": -1.0, "roll": 2.8},
+    "shy": {"yaw": -1.0, "pitch": -1.2, "roll": 4.0},
     "neutral": {"yaw": 0.0, "pitch": 0.0, "roll": 0.0},
     "calm": {"yaw": 0.0, "pitch": 0.0, "roll": 0.4},
 }
@@ -172,8 +172,37 @@ _LEXICON: dict[str, tuple[str, float]] = {
 _TAG_RE = re.compile(r"\[(emotion|情绪)\s*:\s*([a-zA-Z_\u4e00-\u9fff]+)(?:\s+intensity\s*[:=]\s*([0-9.]+))?\]", re.I)
 
 
+_NEGATIONS = "不没别无非未"
+_INTENSIFIERS = {
+    "非常": 0.16,
+    "特别": 0.14,
+    "超级": 0.16,
+    "太": 0.12,
+    "很": 0.10,
+    "好": 0.08,
+    "有点": -0.16,
+    "稍微": -0.14,
+    "一点": -0.12,
+}
+_NEGATED = {
+    "happy": ("sad", 0.48),
+    "joy": ("sad", 0.48),
+    "excited": ("calm", 0.40),
+    "sad": ("calm", 0.40),
+    "angry": ("calm", 0.42),
+    "surprised": ("neutral", 0.40),
+    "thinking": ("neutral", 0.38),
+    "curious": ("neutral", 0.38),
+}
+
+
 def emotion_from_text(text: str) -> tuple[str, float] | None:
-    """Cheap, local affect heuristic; no LLM round-trip and no visible tags."""
+    """Cheap, local affect heuristic; no LLM round-trip and no visible tags.
+
+    It searches all lexicon hits rather than returning the first one, handles
+    common Chinese negation ("不开心") and intensity adverbs, and keeps the
+    explicit tag path as the highest-priority side channel.
+    """
     tag = _TAG_RE.search(text)
     if tag:
         try:
@@ -181,10 +210,32 @@ def emotion_from_text(text: str) -> tuple[str, float] | None:
         except ValueError:
             intensity = 0.8
         return tag.group(2).lower(), max(0.0, min(1.0, intensity))
+
     lowered = text.lower()
-    for token, value in _LEXICON.items():
-        if token in lowered:
-            return value
+    best: tuple[str, float] | None = None
+    best_score = 0.0
+    for token, (preset, base_intensity) in _LEXICON.items():
+        start = 0
+        while True:
+            index = lowered.find(token, start)
+            if index < 0:
+                break
+            before = text[max(0, index - 3):index]
+            intensity = base_intensity
+            for word, delta in _INTENSIFIERS.items():
+                if word in before:
+                    intensity += delta
+                    break
+            if any(ch in before for ch in _NEGATIONS):
+                preset, intensity = _NEGATED.get(preset, ("neutral", 0.4))
+            intensity = max(0.05, min(1.0, intensity))
+            if intensity > best_score:
+                best = (preset, intensity)
+                best_score = intensity
+            start = index + max(1, len(token))
+
+    if best is not None:
+        return best
     if "?" in text or "？" in text:
         return ("curious", 0.45)
     if "!" in text or "！" in text:

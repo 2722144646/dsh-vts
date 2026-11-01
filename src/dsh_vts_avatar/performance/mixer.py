@@ -269,6 +269,27 @@ class PerformanceMixer:
         # Optional emotion parameters; harmless if absent because profile filters.
         params["Brows"] = self._sv("Brows", clamp(brow, -1, 1), dt, 0.18, 0.50)
         params["FaceAngry"] = self._sv("FaceAngry", clamp(angry, 0, 1), dt, 0.20, 0.60)
+        # Looking aside is what makes "thinking" read as thinking instead of
+        # sad. The values are expression targets already blended by the mixer.
+        for eye_name in ("EyeLeftX", "EyeRightX", "EyeLeftY", "EyeRightY"):
+            if self.profile is not None and self.profile.has(eye_name):
+                axis = "gaze_x" if eye_name.endswith("X") else "gaze_y"
+                params[eye_name] = self._sv(
+                    eye_name,
+                    clamp(emotional.get(axis, 0.0), -1.0, 1.0),
+                    dt,
+                    0.18,
+                    0.40,
+                )
+        for brow_name, key in (("BrowLeftY", "brow_l"), ("BrowRightY", "brow_r")):
+            if self.profile is not None and self.profile.has(brow_name):
+                params[brow_name] = self._sv(
+                    brow_name,
+                    clamp(emotional.get(key, 0.0), 0.0, 1.0),
+                    dt,
+                    0.18,
+                    0.45,
+                )
         if self.profile is not None and self.profile.has(a.brow_inner):
             params[a.brow_inner] = self._sv(
                 a.brow_inner, clamp(emotional["inner_brow"], 0, 1), dt, 0.18, 0.55
@@ -331,6 +352,10 @@ class PerformanceMixer:
             "angry": angry,
             "inner_brow": inner_brow,
             "open": open_emotion,
+            "gaze_x": 0.0,
+            "gaze_y": 0.0,
+            "brow_l": 0.0,
+            "brow_r": 0.0,
         }
         expression = EXPRESSION_TARGETS.get(self.emotion.preset)
         strength = clamp(
