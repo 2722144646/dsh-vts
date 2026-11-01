@@ -381,14 +381,6 @@ class AvatarEngine:
     def set_emotion(self, name: str, intensity: float = 0.7) -> None:
         if self.mixer is not None:
             self.mixer.set_emotion(name, intensity)
-            gesture = {
-                "thinking": "think_side",
-                "思考": "think_side",
-                "shy": "shy_avoid",
-                "害羞": "shy_avoid",
-            }.get(name)
-            if gesture and not any(cue.kind == gesture and not cue.finished for cue in self.mixer.actions):
-                self.mixer.add_action(gesture, intensity)
 
     async def record_expression(self, name: str, seconds: float = 4.0) -> dict[str, Any]:
         """Read-only capture of a user-performed expression.
