@@ -333,7 +333,11 @@ class PerformanceMixer:
             "open": open_emotion,
         }
         expression = EXPRESSION_TARGETS.get(self.emotion.preset)
-        strength = clamp(self.emotion.preset_intensity, 0.0, 1.0)
+        strength = clamp(
+            self.emotion.preset_intensity * self._gain("expression_gain", 1.0),
+            0.0,
+            1.0,
+        )
         if expression and strength > 0.001:
             for key, value in expression.items():
                 targets[key] = targets.get(key, 0.0) * (1.0 - strength) + value * strength
@@ -362,7 +366,11 @@ class PerformanceMixer:
         y += self._state_bias["y"] * self._speech_blend
         z += self._state_bias["z"] * self._speech_blend
         expression_head = EXPRESSION_HEAD.get(self.emotion.preset, {})
-        strength = clamp(self.emotion.preset_intensity, 0.0, 1.0)
+        strength = clamp(
+            self.emotion.preset_intensity * self._gain("expression_head_gain", 1.0),
+            0.0,
+            1.0,
+        )
         x += expression_head.get("yaw", 0.0) * strength
         y += expression_head.get("pitch", 0.0) * strength
         z += expression_head.get("roll", 0.0) * strength
