@@ -82,7 +82,7 @@ uv pip install --python .venv\Scripts\python.exe -e .
 
 - `vts_avatar_look`：抓一张 NDI 当前画面，返回路径和运动指标；
 - `vts_avatar_say`：让角色念一句测试文本；
-- `vts_avatar_emote`：显式设置表情（happy/sad/angry/surprised/thinking/shy/calm/neutral）。
+- `vts_avatar_emote`：显式设置表情（happy/sad/angry/surprised/thinking/shy/wronged/calm/neutral）。
 
 ## 不提交的内容
 
