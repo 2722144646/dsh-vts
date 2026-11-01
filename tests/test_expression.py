@@ -1,7 +1,7 @@
 import time
 
 from dsh_vts_avatar.config import AvatarConfig
-from dsh_vts_avatar.performance.emotion import EXPRESSION_TARGETS, EmotionState
+from dsh_vts_avatar.performance.emotion import EXPRESSION_TARGETS, EmotionState, emotion_from_text
 from dsh_vts_avatar.performance.mixer import PerformanceMixer
 
 
@@ -43,3 +43,10 @@ def test_expression_gain_is_read_from_model_profile():
     mixer.emotion.preset_intensity = 1.0
     targets = mixer._emotion_targets()
     assert 0.5 < targets["smile"] < 0.9
+
+
+def test_negation_and_intensifier_are_automatic():
+    assert emotion_from_text("我不开心")[0] == "sad"
+    assert emotion_from_text("不生气")[0] == "calm"
+    assert emotion_from_text("太开心了")[1] > 0.8
+    assert emotion_from_text("有点难过")[1] < 0.8
