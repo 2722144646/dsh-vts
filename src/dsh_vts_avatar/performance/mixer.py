@@ -280,16 +280,38 @@ class PerformanceMixer:
                 jaw = 0.0
                 mouth_open = min(mouth_open, 0.035)
         if self._mouth_backend in ("continuous", "hybrid"):
-            params[a.mouth_open] = self._sv(a.mouth_open, mouth_open * mouth_gain, dt, 0.025, 0.080)
+            params[a.mouth_open] = self._sv(
+                a.mouth_open,
+                mouth_open * mouth_gain,
+                dt,
+                0.012 if segment.kind == "consonant" else 0.025,
+                0.060 if segment.kind == "consonant" else 0.080,
+            )
         if self._mouth_backend in ("vowel", "hybrid"):
-            for name, value in voice.items():
-                target = value * mouth_gain
-                params[name] = self._sv(name, target, dt, 0.020, 0.070)
+            # Always write all five voice params. Previously a consonant
+            # returned an empty voice dict, so VTS kept the last vowel alive
+            # through /p/ /b/ /m/ and the mouth no longer matched the text.
+            voice_defaults = {
+                a.voice_a: "A",
+                a.voice_i: "I",
+                a.voice_u: "U",
+                a.voice_e: "E",
+                a.voice_o: "O",
+            }
+            for name, vowel in voice_defaults.items():
+                target = float(voice.get(vowel, 0.0)) * mouth_gain
+                params[name] = self._sv(
+                    name, target, dt, 0.012 if segment.kind == "consonant" else 0.020, 0.055
+                )
             # The vowel blendshape defines the shape; MouthOpen supplies the
             # visible jaw opening. Do not scale it down a second time after the
             # viseme curve has already been calibrated to the model ceiling.
             params[a.mouth_open] = self._sv(
-                a.mouth_open, mouth_open * mouth_gain, dt, 0.025, 0.080
+                a.mouth_open,
+                mouth_open * mouth_gain,
+                dt,
+                0.012 if segment.kind == "consonant" else 0.025,
+                0.060 if segment.kind == "consonant" else 0.080,
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
@@ -457,6 +479,10 @@ class PerformanceMixer:
             return base
         current = timeline.segments[index]
         if current.start != segment.start or current.end != segment.end:
+            return base
+        if (current.phoneme or "").lower() in {"p", "b", "m"}:
+            # Keep bilabial closures crisp; blending a neighbouring vowel into
+            # a 10-30ms /p/ or /m/ makes it look like the mouth never closes.
             return base
         pre = max(1, int(self.sample_rate * 0.030))
         post = max(1, int(self.sample_rate * 0.020))
