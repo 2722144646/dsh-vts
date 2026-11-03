@@ -33,6 +33,8 @@ class TTSConfig:
     language: str = "zh"
     length_scale: float = 1.0
     sentence_silence: float = 0.08
+    postprocess: bool = False
+    ffmpeg_path: Path = Path("D:/ruanjian/oopz/ffmpeg.exe")
 
 
 @dataclass(slots=True)
@@ -196,6 +198,8 @@ def load_config(path: str | Path | None = None) -> Config:
         language=str(tts_raw.get("language", "zh")),
         length_scale=float(tts_raw.get("length_scale", 1.0)),
         sentence_silence=float(tts_raw.get("sentence_silence", 0.08)),
+        postprocess=bool(tts_raw.get("postprocess", False)),
+        ffmpeg_path=Path(tts_raw.get("ffmpeg_path", "D:/ruanjian/oopz/ffmpeg.exe")),
     )
     cfg.audio = AudioConfig(
         device=int(audio_raw["device"]) if audio_raw.get("device") is not None else None,
@@ -269,6 +273,7 @@ def load_config(path: str | Path | None = None) -> Config:
     cfg.vts.profile_dir = cfg.resolve(cfg.vts.profile_dir)  # type: ignore[assignment]
     cfg.tts.voice_model = cfg.resolve(cfg.tts.voice_model)  # type: ignore[assignment]
     cfg.tts.voice_config = cfg.resolve(cfg.tts.voice_config)
+    cfg.tts.ffmpeg_path = cfg.resolve(cfg.tts.ffmpeg_path)  # type: ignore[assignment]
     cfg.rvc.api_key_file = cfg.resolve(cfg.rvc.api_key_file)  # type: ignore[assignment]
     cfg.rvc.cache_dir = cfg.resolve(cfg.rvc.cache_dir)  # type: ignore[assignment]
     cfg.ndi.snapshot_dir = cfg.resolve(cfg.ndi.snapshot_dir)  # type: ignore[assignment]
