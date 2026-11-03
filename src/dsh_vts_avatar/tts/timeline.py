@@ -77,8 +77,31 @@ class Timeline:
             return _silence_segment(0, max(1, self.segments[0].start))
         segment = self.segments[index]
         if s >= segment.end:
-            return _silence_segment(segment.end, max(segment.end + 1, segment.end + 1))
+            return _silence_segment(segment.end, segment.end + 1)
         return segment
+
+    def bilabial_at(self, sample: float | int, window_samples: int = 960) -> VisemeSegment | None:
+        """Return a nearby /p/ /b/ /m/ that a 30Hz control frame can show.
+
+        Piper gives many bilabials only 10-30ms. A 33ms frame can land entirely
+        between two of them; the mouth then never closes for the visible word.
+        A small look-around window preserves the closure without changing the
+        vowel timeline.
+        """
+        if not self.segments:
+            return None
+        s = int(max(0, min(sample, self.duration_samples - 1)))
+        lo = s - max(0, window_samples)
+        hi = s + max(0, window_samples)
+        index = max(0, bisect_right(self._starts, lo) - 1)
+        for segment in self.segments[index:]:
+            if segment.start > hi:
+                break
+            if segment.end < lo:
+                continue
+            if (segment.phoneme or "").lower() in {"p", "b", "m"}:
+                return segment
+        return None
 
     def rms_at(self, sample: float | int) -> float:
         if self.rms.size == 0:
