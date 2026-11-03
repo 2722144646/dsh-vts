@@ -225,7 +225,7 @@ class PerformanceMixer:
         blink = self._blink.update(now)
 
         smile = clamp(
-            emotional["smile"] + speech["form"] * 0.20 + actions.get("smile", 0.0) * 0.5,
+            emotional["smile"] + speech["form"] * 0.45 + actions.get("smile", 0.0) * 0.5,
             -1.0,
             1.0,
         )
@@ -275,11 +275,11 @@ class PerformanceMixer:
         phoneme = (segment.phoneme or "").lower()
         if segment.kind == "vowel":
             if segment.viseme == "O":
-                funnel = 0.45
-                pucker = 0.32
+                funnel = 0.65
+                pucker = 0.55
             elif segment.viseme == "U":
-                funnel = 0.22
-                pucker = 0.52
+                funnel = 0.30
+                pucker = 0.80
             jaw = 0.75 * mouth_open
         elif segment.kind == "consonant":
             # Bilabials close the jaw; other consonants keep a small opening.
