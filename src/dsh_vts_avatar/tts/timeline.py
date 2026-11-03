@@ -232,6 +232,32 @@ class Timeline:
                 cursor += pending_marks
             else:
                 add_span("_", pending_marks)
+
+        # eSpeak sometimes emits an epenthetic ɜ after o in a Chinese syllable
+        # (e.g. 婆 -> o + ɜ). It is not a second visible vowel; merge it into
+        # the rounded vowel so the mouth does not add an E shape mid-syllable.
+        merged: list[VisemeSegment] = []
+        for segment in segments:
+            if (
+                merged
+                and segment.phoneme == "ɜ"
+                and merged[-1].phoneme in {"o", "ɔ"}
+                and segment.start - merged[-1].end <= int(sample_rate * 0.035)
+            ):
+                previous = merged[-1]
+                merged[-1] = VisemeSegment(
+                    previous.start,
+                    segment.end,
+                    previous.phoneme,
+                    previous.viseme,
+                    previous.kind,
+                    max(previous.open, segment.open),
+                    previous.form,
+                    previous.vowel_gain,
+                )
+                continue
+            merged.append(segment)
+        segments = merged
         if cursor != audio.size:
             raise ValueError(f"alignment samples {cursor} != audio samples {audio.size}")
         rms = _rms_envelope(audio, sample_rate)
