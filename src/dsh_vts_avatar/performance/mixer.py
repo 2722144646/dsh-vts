@@ -207,8 +207,18 @@ class PerformanceMixer:
         segment = timeline.at(sample) if timeline is not None else _silence()
         rms = timeline.rms_at(sample) if timeline is not None else 0.0
         env = _energy(rms)
+        bilabial = (
+            timeline.bilabial_at(sample, int(self.sample_rate * 0.020))
+            if timeline is not None
+            else None
+        )
+        mouth_segment = bilabial or segment
 
-        speech = self._speech_coarticulated(timeline, int(sample), segment, env)
+        speech = (
+            self._speech(bilabial, env)
+            if bilabial is not None
+            else self._speech_coarticulated(timeline, int(sample), segment, env)
+        )
         emotional = self._emotion_targets()
         heads = self._head_targets(now)
         actions = self._action_targets(int(sample))
@@ -284,8 +294,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.012 if segment.kind == "consonant" else 0.025,
-                0.035 if segment.kind == "consonant" else 0.080,
+                0.012 if mouth_segment.kind == "consonant" else 0.025,
+                0.035 if mouth_segment.kind == "consonant" else 0.080,
             )
         if self._mouth_backend in ("vowel", "hybrid"):
             # Always write all five voice params. Previously a consonant
@@ -294,8 +304,11 @@ class PerformanceMixer:
             for name in (a.voice_a, a.voice_i, a.voice_u, a.voice_e, a.voice_o):
                 target = float(voice.get(name, 0.0)) * mouth_gain
                 params[name] = self._sv(
-                    name, target, dt, 0.012 if segment.kind == "consonant" else 0.020,
-                    0.030 if segment.kind == "consonant" else 0.055,
+                    name,
+                    target,
+                    dt,
+                    0.012 if mouth_segment.kind == "consonant" else 0.020,
+                    0.030 if mouth_segment.kind == "consonant" else 0.055,
                 )
             # The vowel blendshape defines the shape; MouthOpen supplies the
             # visible jaw opening. Do not scale it down a second time after the
@@ -304,8 +317,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.012 if segment.kind == "consonant" else 0.025,
-                0.035 if segment.kind == "consonant" else 0.080,
+                0.012 if mouth_segment.kind == "consonant" else 0.025,
+                0.035 if mouth_segment.kind == "consonant" else 0.080,
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
