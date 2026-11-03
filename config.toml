@@ -24,8 +24,9 @@ length_scale = 1.22
 sentence_silence = 0.08
 
 [audio]
-# Omit `device` to pick the default output device; set an integer to pin one.
-device = 17
+# Omit `device` to always follow the Windows default output. A hard-coded
+# integer can silently point at a VB-Cable input or a disconnected jack.
+# device = 17
 sample_rate = 48000
 buffer_ms = 140
 av_offset_ms = 0
