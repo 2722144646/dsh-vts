@@ -105,6 +105,7 @@ class PerformanceMixer:
         self._state_bias = {"x": 0.0, "y": 0.0, "z": 0.0}
         self._speech_blend = 0.0
         self._speech_target = 0.0
+        self._last_turn_sample = -10**9
         self._mouth_backend = self._decide_backend()
 
     def _decide_backend(self) -> str:
@@ -183,13 +184,21 @@ class PerformanceMixer:
                     continue
                 if active.start < cue.start + cue.duration and active.start + active.duration > cue.start:
                     return None
+        if cue.kind in {"turn_look_left", "turn_look_right"}:
+            # Do not schedule another look-away within 2s; the first one needs
+            # time to read as a gesture, not a scanning loop.
+            if cue.start - self._last_turn_sample < int(self.sample_rate * 2.0):
+                return None
         self.actions.append(cue)
+        if cue.kind in {"turn_look_left", "turn_look_right"}:
+            self._last_turn_sample = cue.start
         if len(self.actions) > 24:
             self.actions = self.actions[-24:]
         return cue
 
     def reset(self) -> None:
         self.actions.clear()
+        self._last_turn_sample = -10**9
         self._blink.reset()
         self._last_time = time.perf_counter()
 
@@ -371,6 +380,10 @@ class PerformanceMixer:
         gaze_blend = 1.0 - clamp(
             self.emotion.preset_intensity * self._gain("expression_gain", 1.0), 0.0, 1.0
         ) * 0.85
+        if self.state == "listening":
+            # Keep eye contact while the other side is talking; do not drift
+            # away as if the avatar were bored.
+            gaze_blend *= 0.30
         for eye_name in ("EyeLeftX", "EyeRightX", "EyeLeftY", "EyeRightY"):
             if self.profile is not None and self.profile.has(eye_name):
                 axis = "gaze_x" if eye_name.endswith("X") else "gaze_y"

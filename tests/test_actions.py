@@ -9,6 +9,13 @@ def test_overlapping_head_actions_are_suppressed():
     assert mixer.add_action("turn_look_left", 0.5, at_sample=1000) is None
 
 
+def test_turn_look_has_cooldown():
+    mixer = PerformanceMixer(AvatarConfig(mouth_backend="continuous"), 48000)
+    assert mixer.add_action("turn_look_left", 0.5, at_sample=0) is not None
+    assert mixer.add_action("turn_look_right", 0.5, at_sample=48000) is None
+    assert mixer.add_action("turn_look_right", 0.5, at_sample=144000) is not None
+
+
 def test_turn_look_combines_head_and_eyes():
     cue = ActionCue.create("turn_look_left", start=0, sample_rate=48000, intensity=1.0)
     values = cue.sample(24000)
