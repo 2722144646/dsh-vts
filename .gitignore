@@ -21,6 +21,11 @@ data/recording/
 data/expression_shots/
 data/rvc_cache/
 data/demos/
+data/voice_training/
+training/checkpoints/
+training/preprocessed/
+training/dataset/
+training/run*/
 data/*.log
 *.log
 
