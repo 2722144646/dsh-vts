@@ -20,8 +20,10 @@ allow_add_fallback = false
 voice_model = "models/zh_CN-huayan-medium.onnx"
 voice_config = "models/zh_CN-huayan-medium.onnx.json"
 language = "zh"
-length_scale = 1.22
+length_scale = 1.15
 sentence_silence = 0.08
+postprocess = true
+ffmpeg_path = "D:/ruanjian/oopz/ffmpeg.exe"
 
 [audio]
 # Omit `device` to always follow the Windows default output. A hard-coded

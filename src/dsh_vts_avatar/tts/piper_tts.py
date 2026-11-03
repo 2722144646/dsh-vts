@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from ..config import TTSConfig
+from .postprocess import AudioPostProcessor
 from .timeline import Timeline
 
 log = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ class PiperTTS:
         self.voice = None
         self._loaded = False
         self.sample_rate = 22050
+        self.postprocessor = AudioPostProcessor(config, logger=self.log)
 
     @property
     def available(self) -> bool:
@@ -91,8 +93,10 @@ class PiperTTS:
         if not timelines:
             raise PiperAlignmentError("Piper produced no audio chunks")
         if len(timelines) == 1:
-            return timelines[0]
-        return Timeline.concat(timelines)
+            timeline = timelines[0]
+        else:
+            timeline = Timeline.concat(timelines)
+        return self.postprocessor.process(timeline)
 
     def close(self) -> None:
         self.voice = None
