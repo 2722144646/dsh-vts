@@ -33,6 +33,15 @@ av_offset_ms = 0
 # Set false to run the VTS performance without audible playback (useful for probing).
 enabled = true
 
+[rvc]
+# Optional Feiyu RVC timbre conversion. Piper remains the timing master.
+enabled = false
+base_url = "http://127.0.0.1:9880"
+api_key_file = "E:/feiyu/service/.runtime/voice-service/api_key.txt"
+voice = "feiyu"
+cache_dir = "data/rvc_cache"
+timeout_s = 300
+
 [avatar]
 persona_name = "dsh"
 expressiveness = 0.65

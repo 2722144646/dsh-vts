@@ -18,6 +18,7 @@ from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
+from ..tts.rvc import RVCConverter
 from ..tts.timeline import Timeline
 from ..vts.client import VTSClient, VTSError
 from ..vts.profile import ModelProfile, load_for_model, profile_path
@@ -61,6 +62,7 @@ class AvatarEngine:
         self._last_model_check = 0.0
         self._model_refreshing = False
         self._recording = False
+        self.rvc = RVCConverter(config.rvc)
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -443,6 +445,8 @@ class AvatarEngine:
                 started = time.perf_counter()
                 assert self.tts is not None
                 timeline = await asyncio.to_thread(self.tts.synthesize, text)
+                if self.rvc.enabled:
+                    timeline = await asyncio.to_thread(self.rvc.convert, timeline, text)
                 self._last_tts_ms = (time.perf_counter() - started) * 1000.0
                 self._append_timeline(timeline, text)
             except Exception as exc:
