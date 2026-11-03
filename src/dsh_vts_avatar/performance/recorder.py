@@ -229,7 +229,7 @@ async def record_expression(
     session_dir: Path | None = None,
     audio_device: int | None = None,
 ) -> dict[str, Any]:
-    duration_s = max(1.0, min(15.0, float(duration_s)))
+    duration_s = max(1.0, min(120.0, float(duration_s)))
     hz = max(5.0, min(30.0, float(hz)))
     model = await client.current_model()
     period = 1.0 / hz
