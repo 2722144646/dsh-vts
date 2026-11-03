@@ -106,12 +106,23 @@ class BridgeConfig:
 
 
 @dataclass(slots=True)
+class RVCConfig:
+    enabled: bool = False
+    base_url: str = "http://127.0.0.1:9880"
+    api_key_file: Path = Path("E:/feiyu/service/.runtime/voice-service/api_key.txt")
+    voice: str = "feiyu"
+    cache_dir: Path = Path("data/rvc_cache")
+    timeout_s: float = 300.0
+
+
+@dataclass(slots=True)
 class Config:
     root: Path
     vts: VTSConfig = field(default_factory=VTSConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
     avatar: AvatarConfig = field(default_factory=AvatarConfig)
+    rvc: RVCConfig = field(default_factory=RVCConfig)
     ndi: NDIConfig = field(default_factory=NDIConfig)
     bridge: BridgeConfig = field(default_factory=BridgeConfig)
 
@@ -166,6 +177,7 @@ def load_config(path: str | Path | None = None) -> Config:
     avatar_raw = _section(raw, "avatar")
     ndi_raw = _section(raw, "ndi")
     bridge_raw = _section(raw, "bridge")
+    rvc_raw = _section(raw, "rvc")
 
     cfg = Config(root=root)
     cfg.vts = VTSConfig(
@@ -228,6 +240,19 @@ def load_config(path: str | Path | None = None) -> Config:
         voice_e=str(avatar_raw.get("voice_e", "VoiceE")),
         voice_o=str(avatar_raw.get("voice_o", "VoiceO")),
     )
+    cfg.rvc = RVCConfig(
+        enabled=bool(rvc_raw.get("enabled", False)),
+        base_url=str(rvc_raw.get("base_url", "http://127.0.0.1:9880")),
+        api_key_file=Path(
+            rvc_raw.get(
+                "api_key_file",
+                "E:/feiyu/service/.runtime/voice-service/api_key.txt",
+            )
+        ),
+        voice=str(rvc_raw.get("voice", "feiyu")),
+        cache_dir=Path(rvc_raw.get("cache_dir", "data/rvc_cache")),
+        timeout_s=float(rvc_raw.get("timeout_s", 300.0)),
+    )
     cfg.ndi = NDIConfig(
         source=str(ndi_raw.get("source", "")),
         snapshot_dir=Path(ndi_raw.get("snapshot_dir", "data/ndi")),
@@ -244,10 +269,18 @@ def load_config(path: str | Path | None = None) -> Config:
     cfg.vts.profile_dir = cfg.resolve(cfg.vts.profile_dir)  # type: ignore[assignment]
     cfg.tts.voice_model = cfg.resolve(cfg.tts.voice_model)  # type: ignore[assignment]
     cfg.tts.voice_config = cfg.resolve(cfg.tts.voice_config)
+    cfg.rvc.api_key_file = cfg.resolve(cfg.rvc.api_key_file)  # type: ignore[assignment]
+    cfg.rvc.cache_dir = cfg.resolve(cfg.rvc.cache_dir)  # type: ignore[assignment]
     cfg.ndi.snapshot_dir = cfg.resolve(cfg.ndi.snapshot_dir)  # type: ignore[assignment]
     return cfg
 
 
 def ensure_dirs(cfg: Config) -> None:
-    for path in (cfg.token_path.parent, cfg.contract_path.parent, cfg.profile_dir, cfg.snapshot_dir):
+    for path in (
+        cfg.token_path.parent,
+        cfg.contract_path.parent,
+        cfg.profile_dir,
+        cfg.snapshot_dir,
+        cfg.rvc.cache_dir,
+    ):
         path.mkdir(parents=True, exist_ok=True)
