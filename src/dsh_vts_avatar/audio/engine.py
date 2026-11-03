@@ -123,8 +123,9 @@ class AudioEngine:
             self.config.av_offset_ms * self.sample_rate / 1000.0
         )
         self.log.info(
-            "audio started: device=%s rate=%d latency=%.1fms av_offset=%dms",
+            "audio started: device=%s name=%r rate=%d latency=%.1fms av_offset=%dms",
             device,
+            str(self._sd.query_devices(device).get("name", "")),
             self.sample_rate,
             latency_s * 1000,
             self.config.av_offset_ms,
