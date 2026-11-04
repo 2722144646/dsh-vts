@@ -550,9 +550,27 @@ class PerformanceMixer:
     # -- emotion ----------------------------------------------------------
 
     def _emotion_targets(self) -> dict[str, float]:
+        if self.emotion.preset == "neutral":
+            # The model maps MouthSmile through MouthForm -1..1 and Brows
+            # through -1..1 with an input floor of 0.15. Sending 0 made the
+            # mouth frown and the brows collapse; these are the model's neutral
+            # input values, not zero.
+            return {
+                "smile": 0.50,
+                "eye": 0.55,
+                "brow": 0.575,
+                "angry": 0.0,
+                "inner_brow": 0.0,
+                "open": 0.0,
+                "gaze_x": 0.0,
+                "gaze_y": 0.0,
+                "brow_l": 0.0,
+                "brow_r": 0.0,
+            }
         v = self.emotion.valence
         a = self.emotion.arousal
         i = self.emotion.intensity
+
         smile = 0.20 + 0.82 * v * (0.6 + 0.4 * i)
         # Surprise widens; sadness lowers; anger narrows and lowers brow.
         eye = 0.92 + 0.10 * max(0.0, a - 0.55) - 0.12 * max(0.0, -v) - 0.04 * max(0.0, v)
