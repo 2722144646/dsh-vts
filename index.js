@@ -211,8 +211,15 @@ export function apply(ctx, config = {}) {
         description:
           'Capture the current VTube Studio NDI self-view and return a JPEG path plus motion metrics. ' +
           'Use the read_image tool on the returned path when you need to actually see your avatar face, ' +
-          'mouth, eyes, head or body pose.',
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
+          'mouth, eyes, head or body pose. Set frames > 1 to capture a short motion sequence and return a contact sheet.',
+        parameters: {
+          type: 'object',
+          properties: {
+            frames: { type: 'integer', minimum: 1, maximum: 12, description: 'Number of frames to capture; default 1.' },
+            interval_ms: { type: 'integer', minimum: 0, maximum: 1000, description: 'Delay between frames; default 180ms.' },
+          },
+          additionalProperties: false,
+        },
         output: {
           schema: {
             type: 'object',
@@ -224,6 +231,9 @@ export function apply(ctx, config = {}) {
               height: { type: 'number' },
               brightness: { type: 'number' },
               motion: { type: 'number' },
+              mean_motion: { type: 'number' },
+              frames: { type: 'number' },
+              sequence: { type: 'string' },
               source: { type: 'string' },
               error: { type: 'string' },
             },
@@ -237,9 +247,11 @@ export function apply(ctx, config = {}) {
             },
           ],
         },
-        async execute() {
+        async execute(args) {
           try {
-            const metrics = await client.request('snapshot', {}, 6000);
+            const frames = Math.max(1, Math.min(12, Number(args?.frames ?? 1)));
+            const intervalMs = Math.max(0, Math.min(1000, Number(args?.interval_ms ?? 180)));
+            const metrics = await client.request('snapshot', { frames, interval_ms: intervalMs }, 12000);
             if (!metrics) {
               return { ok: false, error: 'NDI self-view is not available. Enable NDI output in VTS.' };
             }

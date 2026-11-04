@@ -162,6 +162,46 @@ class NDICapture:
         _frame, metrics = self.capture(timeout_ms=1000)
         return metrics or self._last_metrics
 
+    def capture_sequence(self, count: int = 4, interval_ms: int = 180) -> tuple[list[NDIMetrics], str | None]:
+        """Capture several frames and a contact sheet for motion inspection."""
+        count = max(1, min(12, int(count)))
+        interval = max(0, min(2000, int(interval_ms)))
+        frames: list[np.ndarray] = []
+        metrics_list: list[NDIMetrics] = []
+        for index in range(count):
+            frame, metrics = self.capture(timeout_ms=1500)
+            if frame is None or metrics is None:
+                break
+            path = self.snapshot_dir / f"sequence_{index:02d}.jpg"
+            cv2.imwrite(str(path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+            metrics.snapshot = str(path)
+            frames.append(frame)
+            metrics_list.append(metrics)
+            if index + 1 < count and interval:
+                time.sleep(interval / 1000.0)
+        if not frames:
+            return [], None
+        tiles = []
+        height, width = frames[0].shape[:2]
+        scale = min(1.0, 480.0 / max(1, width))
+        tile_w, tile_h = max(1, int(width * scale)), max(1, int(height * scale))
+        for index, frame in enumerate(frames):
+            tile = cv2.resize(frame, (tile_w, tile_h))
+            cv2.putText(tile, str(index), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+            tiles.append(tile)
+        columns = min(4, len(tiles))
+        rows = []
+        for start in range(0, len(tiles), columns):
+            row = tiles[start:start + columns]
+            while len(row) < columns:
+                row.append(np.zeros_like(tiles[0]))
+            rows.append(np.hstack(row))
+        sheet = np.vstack(rows)
+        sheet_path = self.snapshot_dir / "sequence.jpg"
+        cv2.imwrite(str(sheet_path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+        self._last_metrics = metrics_list[-1]
+        return metrics_list, str(sheet_path)
+
     @property
     def metrics(self) -> NDIMetrics | None:
         return self._last_metrics
