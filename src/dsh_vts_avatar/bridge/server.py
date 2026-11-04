@@ -171,6 +171,16 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "parameters":
+            await ws.send(
+                orjson.dumps(
+                    {
+                        "type": "parameters.result",
+                        "request_id": msg.get("request_id"),
+                        "data": self.engine.parameters(),
+                    }
+                ).decode("utf-8")
+            )
         elif mtype == "status":
             await ws.send(orjson.dumps({"type": "status", "status": self.engine.status()}).decode("utf-8"))
         elif mtype == "ping":

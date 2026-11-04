@@ -63,6 +63,7 @@ class AvatarEngine:
         self._last_model_check = 0.0
         self._model_refreshing = False
         self._recording = False
+        self._last_params: dict[str, float] = {}
         self.rvc = RVCConverter(config.rvc)
 
     # -- lifecycle ---------------------------------------------------------
@@ -525,6 +526,7 @@ class AvatarEngine:
                 sample = self.clock.now_sample()
                 self._last_sample = sample
                 params = self.mixer.compute(sample, self.timeline, now)
+                self._last_params = params
                 if self.vts.authenticated and params:
                     try:
                         await self.vts.inject(params)
@@ -576,6 +578,16 @@ class AvatarEngine:
             await self.on_event(payload)
         except Exception:
             log.debug("event sink failed", exc_info=True)
+
+    def parameters(self) -> dict[str, Any]:
+        segment = self.timeline.at(self._last_sample) if self.timeline is not None else None
+        return {
+            "sample": self._last_sample,
+            "state": self.mixer.state if self.mixer else "idle",
+            "params": dict(self._last_params),
+            "phoneme": segment.phoneme if segment else None,
+            "viseme": segment.viseme if segment else None,
+        }
 
     def status(self) -> dict[str, Any]:
         return {
