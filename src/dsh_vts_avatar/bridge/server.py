@@ -161,7 +161,10 @@ class BridgeServer:
             ok = await self.engine.reconnect()
             await ws.send(orjson.dumps({"type": "reconnected", "ok": ok}).decode("utf-8"))
         elif mtype == "snapshot":
-            metrics = await self.engine.snapshot()
+            metrics = await self.engine.snapshot(
+                frames=max(1, min(12, int(msg.get("frames", 1)))),
+                interval_ms=int(msg.get("interval_ms", 180)),
+            )
             await ws.send(
                 orjson.dumps(
                     {

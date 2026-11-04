@@ -251,13 +251,36 @@ class AvatarEngine:
         except Exception as exc:
             log.info("NDI self-view unavailable: %s", exc)
 
-    async def snapshot(self) -> dict[str, Any] | None:
-        """Capture one NDI frame for the agent's self-view tool."""
+    async def snapshot(self, frames: int = 1, interval_ms: int = 180) -> dict[str, Any] | None:
+        """Capture one frame or a short NDI sequence for self-inspection."""
         if self.ndi is None:
             self._open_ndi()
         if self.ndi is None:
             return None
         try:
+            if frames > 1:
+                metrics_list, sheet = await asyncio.to_thread(
+                    self.ndi.capture_sequence, frames, interval_ms
+                )
+                if not metrics_list or sheet is None:
+                    return None
+                last = metrics_list[-1]
+                self._last_ndi = last
+                return {
+                    "path": sheet,
+                    "sequence": sheet,
+                    "paths": [item.snapshot for item in metrics_list],
+                    "frames": len(metrics_list),
+                    "width": last.width,
+                    "height": last.height,
+                    "brightness": round(last.brightness, 2),
+                    "motion": round(max(item.motion for item in metrics_list), 3),
+                    "mean_motion": round(
+                        sum(item.motion for item in metrics_list) / len(metrics_list), 3
+                    ),
+                    "source": last.source,
+                    "timestamp": last.timestamp,
+                }
             metrics = await asyncio.to_thread(self.ndi.snapshot)
             if metrics is None:
                 return None
