@@ -28,7 +28,7 @@
 ### 模型
 
 - 正式：`models/feiyu_distill_v8_final.onnx`，直接作为 Piper 声线
-  - `length_scale = 1.00`
+  - `length_scale = 1.10`
   - `postprocess = true`
   - `noise_scale = 0.50`
   - `noise_w_scale = 0.70`
