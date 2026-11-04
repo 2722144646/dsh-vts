@@ -107,13 +107,6 @@ class PerformanceMixer:
         self._speech_target = 0.0
         self._last_turn_sample = -10**9
         self._mouth_backend = self._decide_backend()
-        self._head_pose = {"x": 0.0, "y": 0.0, "z": 0.0}
-        self._head_pose_until = 0.0
-
-    def set_head_pose(self, yaw: float = 0.0, pitch: float = 0.0, roll: float = 0.0, seconds: float = 8.0) -> None:
-        """Temporary inspection pose; does not alter idle/action behavior."""
-        self._head_pose = {"x": float(yaw), "y": float(pitch), "z": float(roll)}
-        self._head_pose_until = time.perf_counter() + max(0.5, float(seconds))
 
     def _decide_backend(self) -> str:
         requested = (self.avatar.mouth_backend or "auto").lower()
@@ -289,8 +282,6 @@ class PerformanceMixer:
         funnel = 0.0
         pucker = 0.0
         phoneme = (segment.phoneme or "").lower()
-        mouth_phoneme = (mouth_segment.phoneme or "").lower()
-        bilabial_phone = mouth_phoneme in {"p", "b", "m"}
         if segment.kind == "vowel":
             if segment.viseme == "O":
                 funnel = 0.65
@@ -312,8 +303,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.008 if bilabial_phone else (0.012 if mouth_segment.kind == "consonant" else 0.025),
-                0.015 if bilabial_phone else (0.035 if mouth_segment.kind == "consonant" else 0.080),
+                0.012 if mouth_segment.kind == "consonant" else 0.025,
+                0.035 if mouth_segment.kind == "consonant" else 0.080,
             )
         if self._mouth_backend in ("vowel", "hybrid"):
             # Always write all five voice params. Previously a consonant
@@ -335,8 +326,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.008 if bilabial_phone else (0.012 if mouth_segment.kind == "consonant" else 0.025),
-                0.015 if bilabial_phone else (0.035 if mouth_segment.kind == "consonant" else 0.080),
+                0.012 if mouth_segment.kind == "consonant" else 0.025,
+                0.035 if mouth_segment.kind == "consonant" else 0.080,
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
@@ -513,23 +504,15 @@ class PerformanceMixer:
             # Keep bilabial closures crisp; blending a neighbouring vowel into
             # a 10-30ms /p/ or /m/ makes it look like the mouth never closes.
             return base
-        pre = max(1, int(self.sample_rate * (0.045 if current.kind == "vowel" else 0.030)))
-        post = max(1, int(self.sample_rate * (0.030 if current.kind == "vowel" else 0.020)))
+        pre = max(1, int(self.sample_rate * 0.030))
+        post = max(1, int(self.sample_rate * 0.020))
         if index > 0 and sample - current.start < pre:
-            previous_segment = timeline.segments[index - 1]
-            previous = self._speech(previous_segment, env)
-            # Chinese diphthongs often arrive as two adjacent vowels (a+i,
-            # e+i, a+o). Give that boundary a wider, stronger blend than a
-            # normal consonant-to-vowel transition so the mouth glides instead
-            # of stepping from one viseme to the next.
-            peak = 0.50 if current.kind == "vowel" and previous_segment.kind == "vowel" else 0.35
-            weight = peak * (1.0 - (sample - current.start) / pre)
+            previous = self._speech(timeline.segments[index - 1], env)
+            weight = 0.35 * (1.0 - (sample - current.start) / pre)
             return self._blend_speech(previous, base, 1.0 - weight)
         if index + 1 < len(timeline.segments) and current.end - sample < post:
-            following_segment = timeline.segments[index + 1]
-            following = self._speech(following_segment, env)
-            peak = 0.50 if current.kind == "vowel" and following_segment.kind == "vowel" else 0.35
-            weight = peak * (1.0 - (current.end - sample) / post)
+            following = self._speech(timeline.segments[index + 1], env)
+            weight = 0.35 * (1.0 - (current.end - sample) / post)
             return self._blend_speech(base, following, weight)
         return base
 
@@ -567,27 +550,9 @@ class PerformanceMixer:
     # -- emotion ----------------------------------------------------------
 
     def _emotion_targets(self) -> dict[str, float]:
-        if self.emotion.preset == "neutral" or self.emotion.preset_intensity < 0.08:
-            # The model maps MouthSmile through MouthForm -1..1 and Brows
-            # through -1..1 with an input floor of 0.15. Sending 0 made the
-            # mouth frown and the brows collapse; these are the model's neutral
-            # input values, not zero.
-            return {
-                "smile": 0.50,
-                "eye": 0.55,
-                "brow": 0.575,
-                "angry": 0.0,
-                "inner_brow": 0.0,
-                "open": 0.0,
-                "gaze_x": 0.0,
-                "gaze_y": 0.0,
-                "brow_l": 0.0,
-                "brow_r": 0.0,
-            }
         v = self.emotion.valence
         a = self.emotion.arousal
         i = self.emotion.intensity
-
         smile = 0.20 + 0.82 * v * (0.6 + 0.4 * i)
         # Surprise widens; sadness lowers; anger narrows and lowers brow.
         eye = 0.92 + 0.10 * max(0.0, a - 0.55) - 0.12 * max(0.0, -v) - 0.04 * max(0.0, v)
@@ -651,10 +616,6 @@ class PerformanceMixer:
         x += expression_head.get("yaw", 0.0) * strength
         y += expression_head.get("pitch", 0.0) * strength
         z += expression_head.get("roll", 0.0) * strength
-        if now < self._head_pose_until:
-            x += self._head_pose["x"]
-            y += self._head_pose["y"]
-            z += self._head_pose["z"]
         return {"x": x * gain, "y": y * gain, "z": z * gain}
 
     def _update_state_bias(self, dt: float) -> None:
