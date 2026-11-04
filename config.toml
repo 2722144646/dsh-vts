@@ -17,18 +17,20 @@ allow_add_fallback = false
 [tts]
 # Download a voice with:
 #   .venv\Scripts\python.exe -m piper.download_voices --download-dir models zh_CN-huayan-medium
-voice_model = "models/zh_CN-huayan-medium.onnx"
-voice_config = "models/zh_CN-huayan-medium.onnx.json"
+voice_model = "models/feiyu_distill_v8_final.onnx"
+voice_config = "models/feiyu_distill_v8_final.onnx.json"
 language = "zh"
-length_scale = 1.22
+length_scale = 1.20
 sentence_silence = 0.08
-postprocess = false
+postprocess = true
 ffmpeg_path = "D:/ruanjian/oopz/ffmpeg.exe"
+noise_scale = 0.50
+noise_w_scale = 0.70
 # Distill wrapper is intentionally disabled: v8 is used as the native Piper
 # voice so no atempo stretching is applied.
 # distill_model = "models/feiyu_distill_v7.onnx"
 # distill_voice_config = "models/feiyu_distill_v7.onnx.json"
-# distill_length_scale = 1.22
+# distill_length_scale = 1.20
 
 [audio]
 # Omit `device` to always follow the Windows default output. A hard-coded
@@ -106,7 +108,6 @@ snapshot_interval_ms = 500
 [bridge]
 host = "127.0.0.1"
 port = 8765
-
 
 
 
