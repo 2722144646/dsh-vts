@@ -137,3 +137,7 @@ cp /path/training/preprocessed/config.json /path/feiyu_distill_v2.onnx.json
 - v1：30 epoch / 300 step，`loss_gen_all≈38.37`，导出成功
 - v1 同一句：原 huayan 3.994s，蒸馏版 6.478s
 - 结论：训练量不足，时长预测没收敛，不接入正式链路
+- v6：从 v5 继续到 epoch 3349，导出 `models/feiyu_distill_v6.onnx`
+- v6 混合时间轴：原 huayan 4.087s，蒸馏输出 4.087s，比例 1.000
+- `DistilledPiperTTS` 已接入 bridge，配置指向 v6
+- 仍需：语料扩到 60 分钟、人工试听、VTS 在线验收
