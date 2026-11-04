@@ -508,11 +508,13 @@ class PerformanceMixer:
         post = max(1, int(self.sample_rate * 0.020))
         if index > 0 and sample - current.start < pre:
             previous = self._speech(timeline.segments[index - 1], env)
-            weight = 0.35 * (1.0 - (sample - current.start) / pre)
+            peak = 0.50 if current.kind == "vowel" and timeline.segments[index - 1].kind == "vowel" else 0.35
+            weight = peak * (1.0 - (sample - current.start) / pre)
             return self._blend_speech(previous, base, 1.0 - weight)
         if index + 1 < len(timeline.segments) and current.end - sample < post:
             following = self._speech(timeline.segments[index + 1], env)
-            weight = 0.35 * (1.0 - (current.end - sample) / post)
+            peak = 0.50 if current.kind == "vowel" and timeline.segments[index + 1].kind == "vowel" else 0.35
+            weight = peak * (1.0 - (current.end - sample) / post)
             return self._blend_speech(base, following, weight)
         return base
 
@@ -550,6 +552,23 @@ class PerformanceMixer:
     # -- emotion ----------------------------------------------------------
 
     def _emotion_targets(self) -> dict[str, float]:
+        if self.emotion.preset == "neutral" or self.emotion.preset_intensity < 0.08:
+            # The model maps MouthSmile through MouthForm -1..1 and Brows
+            # through -1..1 with an input floor of 0.15. Sending 0 made the
+            # mouth frown and the brows collapse; these are the model's neutral
+            # input values, not zero.
+            return {
+                "smile": 0.50,
+                "eye": 0.55,
+                "brow": 0.575,
+                "angry": 0.0,
+                "inner_brow": 0.0,
+                "open": 0.0,
+                "gaze_x": 0.0,
+                "gaze_y": 0.0,
+                "brow_l": 0.0,
+                "brow_r": 0.0,
+            }
         v = self.emotion.valence
         a = self.emotion.arousal
         i = self.emotion.intensity
