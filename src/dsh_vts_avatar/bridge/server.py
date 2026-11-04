@@ -171,6 +171,14 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "head_pose":
+            ok = self.engine.set_head_pose(
+                yaw=float(msg.get("yaw", 0.0)),
+                pitch=float(msg.get("pitch", 0.0)),
+                roll=float(msg.get("roll", 0.0)),
+                seconds=float(msg.get("seconds", 8.0)),
+            )
+            await ws.send(orjson.dumps({"type": "head_pose.result", "ok": ok}).decode("utf-8"))
         elif mtype == "parameters":
             await ws.send(
                 orjson.dumps(
