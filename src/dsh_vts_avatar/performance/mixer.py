@@ -550,7 +550,7 @@ class PerformanceMixer:
     # -- emotion ----------------------------------------------------------
 
     def _emotion_targets(self) -> dict[str, float]:
-        if self.emotion.preset == "neutral":
+        if self.emotion.preset == "neutral" or self.emotion.preset_intensity < 0.08:
             # The model maps MouthSmile through MouthForm -1..1 and Brows
             # through -1..1 with an input floor of 0.15. Sending 0 made the
             # mouth frown and the brows collapse; these are the model's neutral
