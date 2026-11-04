@@ -43,7 +43,9 @@ sample_rate = 48000
 buffer_ms = 140
 # 0 means "use the audio backend's measured latency". Do not use a manual
 # offset to hide a change in output device or pipeline.
-av_offset_ms = 70
+av_offset_ms = 0
+auto_calibrate = true
+calibration_volume = 0.18
 # Set false to run the VTS performance without audible playback (useful for probing).
 enabled = true
 
@@ -108,6 +110,7 @@ snapshot_interval_ms = 500
 [bridge]
 host = "127.0.0.1"
 port = 8765
+
 
 
 
