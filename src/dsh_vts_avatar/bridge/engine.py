@@ -527,7 +527,7 @@ class AvatarEngine:
         if self.clock is None or self.mixer is None:
             return
         if self._parts and self._pending_gap_s > 0:
-            sample_rate = int(self.clock.sample_rate)
+            sample_rate = int(timeline.sample_rate)
             gap_audio = np.zeros(int(sample_rate * self._pending_gap_s), dtype=np.float32)
             gap = Timeline(
                 sample_rate=sample_rate,
