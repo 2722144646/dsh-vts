@@ -278,6 +278,14 @@ class AvatarEngine:
                     "mean_motion": round(
                         sum(item.motion for item in metrics_list) / len(metrics_list), 3
                     ),
+                    "mouth_motion": round(max(item.mouth_motion for item in metrics_list), 3),
+                    "mean_mouth_motion": round(
+                        sum(item.mouth_motion for item in metrics_list) / len(metrics_list), 3
+                    ),
+                    "head_motion": round(max(item.head_motion for item in metrics_list), 3),
+                    "mean_head_motion": round(
+                        sum(item.head_motion for item in metrics_list) / len(metrics_list), 3
+                    ),
                     "source": last.source,
                     "timestamp": last.timestamp,
                 }
@@ -291,6 +299,8 @@ class AvatarEngine:
                 "height": metrics.height,
                 "brightness": round(metrics.brightness, 2),
                 "motion": round(metrics.motion, 3),
+                "mouth_motion": round(metrics.mouth_motion, 3),
+                "head_motion": round(metrics.head_motion, 3),
                 "source": metrics.source,
                 "timestamp": metrics.timestamp,
             }

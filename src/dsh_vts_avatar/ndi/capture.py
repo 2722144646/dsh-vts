@@ -30,6 +30,8 @@ class NDIMetrics:
     motion: float
     source: str
     snapshot: str | None = None
+    mouth_motion: float = 0.0
+    head_motion: float = 0.0
 
 
 @dataclass
@@ -168,10 +170,16 @@ class NDICapture:
         interval = max(0, min(2000, int(interval_ms)))
         frames: list[np.ndarray] = []
         metrics_list: list[NDIMetrics] = []
+        previous_gray: np.ndarray | None = None
         for index in range(count):
             frame, metrics = self.capture(timeout_ms=1500)
             if frame is None or metrics is None:
                 break
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if previous_gray is not None and previous_gray.shape == gray.shape:
+                metrics.mouth_motion = self._region_motion(previous_gray, gray, 0.40, 0.70, 0.34, 0.66)
+                metrics.head_motion = self._region_motion(previous_gray, gray, 0.12, 0.52, 0.24, 0.76)
+            previous_gray = gray
             path = self.snapshot_dir / f"sequence_{index:02d}.jpg"
             cv2.imwrite(str(path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
             metrics.snapshot = str(path)
@@ -201,6 +209,15 @@ class NDICapture:
         cv2.imwrite(str(sheet_path), sheet, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
         self._last_metrics = metrics_list[-1]
         return metrics_list, str(sheet_path)
+
+    @staticmethod
+    def _region_motion(previous: np.ndarray, current: np.ndarray, y0: float, y1: float, x0: float, x1: float) -> float:
+        height, width = current.shape[:2]
+        ya, yb = max(0, int(height * y0)), min(height, int(height * y1))
+        xa, xb = max(0, int(width * x0)), min(width, int(width * x1))
+        if yb <= ya or xb <= xa:
+            return 0.0
+        return float(np.mean(cv2.absdiff(previous[ya:yb, xa:xb], current[ya:yb, xa:xb])))
 
     @property
     def metrics(self) -> NDIMetrics | None:
