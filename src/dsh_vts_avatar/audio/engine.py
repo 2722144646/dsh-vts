@@ -214,6 +214,7 @@ class AudioEngine:
             if anchor is not None:
                 wall_dac, source_start = anchor
                 played = source_start + (time.perf_counter() - wall_dac) * self.source_rate
+                played -= self.config.av_offset_ms * self.source_rate / 1000.0
                 limit = self._audio.size * self.source_rate / self.sample_rate
                 return int(max(0.0, min(float(limit), played)))
             played = max(0, self._frames_consumed - self._latency_samples)
