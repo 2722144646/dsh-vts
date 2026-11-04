@@ -46,6 +46,7 @@ class AvatarEngine:
         self.segmenter_gesture_rate = config.avatar.gesture_rate
         self.timeline: Timeline | None = None
         self._parts: list[Timeline] = []
+        self._pending_gap_s = 0.0
         self._queue: asyncio.Queue[str] | None = None
         self._worker: asyncio.Task[None] | None = None
         self._ticker: asyncio.Task[None] | None = None
@@ -413,6 +414,7 @@ class AvatarEngine:
                 except Exception:
                     break
         self._parts.clear()
+        self._pending_gap_s = 0.0
         self.timeline = None
         self._last_sample = 0
         self.mouth_monitor.reset()
@@ -524,6 +526,20 @@ class AvatarEngine:
     def _append_timeline(self, timeline: Timeline, text: str) -> None:
         if self.clock is None or self.mixer is None:
             return
+        if self._parts and self._pending_gap_s > 0:
+            sample_rate = int(self.clock.sample_rate)
+            gap_audio = np.zeros(int(sample_rate * self._pending_gap_s), dtype=np.float32)
+            gap = Timeline(
+                sample_rate=sample_rate,
+                audio=gap_audio,
+                spans=[],
+                segments=[],
+                rms=np.zeros(max(1, gap_audio.size // max(1, int(sample_rate * 0.01))), dtype=np.float32),
+                rms_hop=max(1, int(sample_rate * 0.01)),
+            )
+            self.clock.append(gap.audio)
+            self._parts.append(gap)
+            self._pending_gap_s = 0.0
         start_sample = sum(part.duration_samples for part in self._parts)
         self._parts.append(timeline)
         self.timeline = Timeline.concat(self._parts)
@@ -531,6 +547,7 @@ class AvatarEngine:
         if not self.clock.is_running:
             self.clock.start()
         self.mixer.set_state("speaking")
+        self._pending_gap_s = 0.05 if text.rstrip().endswith(("。", "！", "？", ".", "!", "?")) else 0.0
         self._segment_count += 1
         # A small speech emphasis / gesture on selected phrase starts.
         if text and self.segmenter_gesture_rate > 0:

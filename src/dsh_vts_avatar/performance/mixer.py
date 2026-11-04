@@ -282,6 +282,7 @@ class PerformanceMixer:
         funnel = 0.0
         pucker = 0.0
         phoneme = (segment.phoneme or "").lower()
+        bilabial = phoneme in {"p", "b", "m"}
         if segment.kind == "vowel":
             if segment.viseme == "O":
                 funnel = 0.65
@@ -303,8 +304,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.012 if mouth_segment.kind == "consonant" else 0.025,
-                0.035 if mouth_segment.kind == "consonant" else 0.080,
+                0.010 if bilabial else (0.012 if mouth_segment.kind == "consonant" else 0.025),
+                0.020 if bilabial else (0.035 if mouth_segment.kind == "consonant" else 0.080),
             )
         if self._mouth_backend in ("vowel", "hybrid"):
             # Always write all five voice params. Previously a consonant
@@ -316,8 +317,8 @@ class PerformanceMixer:
                     name,
                     target,
                     dt,
-                    0.012 if mouth_segment.kind == "consonant" else 0.020,
-                    0.030 if mouth_segment.kind == "consonant" else 0.055,
+                    0.010 if bilabial else (0.012 if mouth_segment.kind == "consonant" else 0.020),
+                    0.020 if bilabial else (0.030 if mouth_segment.kind == "consonant" else 0.055),
                 )
             # The vowel blendshape defines the shape; MouthOpen supplies the
             # visible jaw opening. Do not scale it down a second time after the
@@ -326,8 +327,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.012 if mouth_segment.kind == "consonant" else 0.025,
-                0.035 if mouth_segment.kind == "consonant" else 0.080,
+                0.010 if bilabial else (0.012 if mouth_segment.kind == "consonant" else 0.025),
+                0.020 if bilabial else (0.035 if mouth_segment.kind == "consonant" else 0.080),
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
