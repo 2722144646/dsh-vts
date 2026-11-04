@@ -35,6 +35,9 @@ class TTSConfig:
     sentence_silence: float = 0.08
     postprocess: bool = False
     ffmpeg_path: Path = Path("D:/ruanjian/oopz/ffmpeg.exe")
+    distill_model: Path | None = None
+    distill_voice_config: Path | None = None
+    distill_length_scale: float = 0.61
 
 
 @dataclass(slots=True)
@@ -200,6 +203,9 @@ def load_config(path: str | Path | None = None) -> Config:
         sentence_silence=float(tts_raw.get("sentence_silence", 0.08)),
         postprocess=bool(tts_raw.get("postprocess", False)),
         ffmpeg_path=Path(tts_raw.get("ffmpeg_path", "D:/ruanjian/oopz/ffmpeg.exe")),
+        distill_model=Path(tts_raw["distill_model"]) if tts_raw.get("distill_model") else None,
+        distill_voice_config=Path(tts_raw["distill_voice_config"]) if tts_raw.get("distill_voice_config") else None,
+        distill_length_scale=float(tts_raw.get("distill_length_scale", 0.61)),
     )
     cfg.audio = AudioConfig(
         device=int(audio_raw["device"]) if audio_raw.get("device") is not None else None,
@@ -274,6 +280,10 @@ def load_config(path: str | Path | None = None) -> Config:
     cfg.tts.voice_model = cfg.resolve(cfg.tts.voice_model)  # type: ignore[assignment]
     cfg.tts.voice_config = cfg.resolve(cfg.tts.voice_config)
     cfg.tts.ffmpeg_path = cfg.resolve(cfg.tts.ffmpeg_path)  # type: ignore[assignment]
+    if cfg.tts.distill_model is not None:
+        cfg.tts.distill_model = cfg.resolve(cfg.tts.distill_model)  # type: ignore[assignment]
+    if cfg.tts.distill_voice_config is not None:
+        cfg.tts.distill_voice_config = cfg.resolve(cfg.tts.distill_voice_config)  # type: ignore[assignment]
     cfg.rvc.api_key_file = cfg.resolve(cfg.rvc.api_key_file)  # type: ignore[assignment]
     cfg.rvc.cache_dir = cfg.resolve(cfg.rvc.cache_dir)  # type: ignore[assignment]
     cfg.ndi.snapshot_dir = cfg.resolve(cfg.ndi.snapshot_dir)  # type: ignore[assignment]
