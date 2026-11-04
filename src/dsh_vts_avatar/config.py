@@ -38,6 +38,8 @@ class TTSConfig:
     distill_model: Path | None = None
     distill_voice_config: Path | None = None
     distill_length_scale: float = 0.61
+    noise_scale: float | None = None
+    noise_w_scale: float | None = None
 
 
 @dataclass(slots=True)
@@ -206,6 +208,8 @@ def load_config(path: str | Path | None = None) -> Config:
         distill_model=Path(tts_raw["distill_model"]) if tts_raw.get("distill_model") else None,
         distill_voice_config=Path(tts_raw["distill_voice_config"]) if tts_raw.get("distill_voice_config") else None,
         distill_length_scale=float(tts_raw.get("distill_length_scale", 0.61)),
+        noise_scale=float(tts_raw["noise_scale"]) if tts_raw.get("noise_scale") is not None else None,
+        noise_w_scale=float(tts_raw["noise_w_scale"]) if tts_raw.get("noise_w_scale") is not None else None,
     )
     cfg.audio = AudioConfig(
         device=int(audio_raw["device"]) if audio_raw.get("device") is not None else None,

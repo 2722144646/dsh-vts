@@ -63,9 +63,15 @@ class PiperTTS:
         assert self.voice is not None
         from piper.config import SynthesisConfig
 
+        synth_kwargs = {}
+        if self.config.noise_scale is not None:
+            synth_kwargs["noise_scale"] = float(self.config.noise_scale)
+        if self.config.noise_w_scale is not None:
+            synth_kwargs["noise_w_scale"] = float(self.config.noise_w_scale)
         synth_config = SynthesisConfig(
             length_scale=max(0.30, min(3.0, float(self.config.length_scale))),
             normalize_audio=True,
+            **synth_kwargs,
         )
         timelines: list[Timeline] = []
         for chunk in self.voice.synthesize(
