@@ -20,7 +20,7 @@ allow_add_fallback = false
 voice_model = "models/feiyu_distill_v8_final.onnx"
 voice_config = "models/feiyu_distill_v8_final.onnx.json"
 language = "zh"
-length_scale = 1.22
+length_scale = 0.80
 sentence_silence = 0.08
 postprocess = true
 ffmpeg_path = "D:/ruanjian/oopz/ffmpeg.exe"
@@ -108,6 +108,7 @@ snapshot_interval_ms = 500
 [bridge]
 host = "127.0.0.1"
 port = 8765
+
 
 
 
