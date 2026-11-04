@@ -106,17 +106,47 @@ class AudioEngine:
                 )
         try:
             default = self._sd.default.device
-            out = default[1] if isinstance(default, (tuple, list)) else default
+            # sounddevice returns an _InputOutputPair here, not a tuple/list.
+            # The pair itself has [0]=input and [1]=output but is not a list.
+            out = default[1] if hasattr(default, "__getitem__") else default
             if out is not None and int(out) >= 0:
-                name = self._device_name(int(out))
+                out = int(out)
+                name = self._device_name(out)
                 if any(token in name.lower() for token in ("bluetooth", "wh-1000", "hands-free")):
                     self.log.warning(
                         "default output looks like Bluetooth (%s); use wired audio for low latency",
                         name,
                     )
+                if "cable" in name.lower():
+                    physical = self._physical_output()
+                    if physical is not None:
+                        self.log.warning(
+                            "default output is a virtual cable (%s); using physical output %s",
+                            name,
+                            physical,
+                        )
+                        return physical
                 return int(out)
         except Exception:
             pass
+        return None
+
+    def _physical_output(self) -> int | None:
+        """Avoid silent VB-Cable as the speech clock when no one consumes it."""
+        try:
+            devices = self._sd.query_devices()
+        except Exception:
+            return None
+        for index, info in enumerate(devices):
+            if not isinstance(info, dict):
+                continue
+            if int(info.get("max_output_channels", 0)) <= 0:
+                continue
+            name = str(info.get("name", "")).lower()
+            if "cable" in name or "hands-free" in name:
+                continue
+            if any(token in name for token in ("realtek", "speaker", "耳机", "headphone")):
+                return index
         return None
 
     def start(self) -> None:
