@@ -8,7 +8,7 @@
 ## 1. 当前运行状态
 
 - VTS API：`ws://127.0.0.1:8002`，模型 `蒂亚圣诞树树`，model_id `8cb985f5b9514021a5c5d941b482e57b`
-- 桥接：`ws://127.0.0.1:8765`，当前加载 **v7 蒸馏声线**
+- 桥接：`ws://127.0.0.1:8765`，当前加载 **v8 final 原生 Piper + 后处理**
 - NDI：`BLOODPEACH (Live2D Camera NDI5)`
 - Feiyu 服务：9880/9881 仍在监听
 - 音频：Windows 默认输出是 **VB-Cable**，用户故意静音；不要自动切换到 Realtek
@@ -27,10 +27,13 @@
 
 ### 模型
 
-- 正式：`models/feiyu_distill_v7.onnx`，配置 `distill_length_scale=0.61`
-- 候选：`models/feiyu_distill_v8_final.onnx`
+- 正式：`models/feiyu_distill_v8_final.onnx`，直接作为 Piper 声线
+  - `length_scale = 0.80`
+  - `postprocess = true`
+  - 不再走 reference-timed atempo 包装
+- 备份：`models/feiyu_distill_v7.onnx`
 - v8 到达 `max_epochs=3469`，最后保存 checkpoint 为 epoch 3459
-- v8 没有切换为正式声线
+- v8 已切换为正式声线；仍需主观验收
 
 ### 参考时间轴方案
 
@@ -103,7 +106,7 @@
 ## 4. 已知问题 / 未完成
 
 1. 语料只有 39.8 分钟，目标 1–2 小时未达成
-2. v8 final 未切换，也没有完整 VTS 在线验收
+2. v8 已切换，但电音/沙哑/吞字的主观验收还没通过
 3. 音色主观质量还没有用户确认
 4. 没有 RVC；当前是 CosyVoice3 gentle 纯 TTS 蒸馏
 5. P1 元音视觉已验收：A 清楚，I/U 可区分但幅度偏弱；下一步要么调 I/U，要么接受当前效果
