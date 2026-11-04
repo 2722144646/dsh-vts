@@ -30,10 +30,13 @@
 - 正式：`models/feiyu_distill_v8_final.onnx`，直接作为 Piper 声线
   - `length_scale = 0.80`
   - `postprocess = true`
+  - `noise_scale = 0.50`
+  - `noise_w_scale = 0.70`
   - 不再走 reference-timed atempo 包装
+  - 这是用户选定的第 6 版调参
 - 备份：`models/feiyu_distill_v7.onnx`
 - v8 到达 `max_epochs=3469`，最后保存 checkpoint 为 epoch 3459
-- v8 已切换为正式声线；仍需主观验收
+- v8 已切换为正式声线
 
 ### 参考时间轴方案
 
