@@ -34,6 +34,8 @@ class DistilledPiperTTS:
         self.candidate = PiperTTS(candidate_config, logger=logger)
         self.sample_rate = self.reference.sample_rate
         self.ffmpeg = Path(config.ffmpeg_path)
+        self.last_factor = 1.0
+        self.last_reference_duration = 0.0
 
     @property
     def available(self) -> bool:
@@ -49,6 +51,8 @@ class DistilledPiperTTS:
         candidate = self.candidate.synthesize(text)
         target_size = reference.audio.size
         factor = reference.duration_s / max(1e-6, candidate.duration_s)
+        self.last_factor = factor
+        self.last_reference_duration = reference.duration_s
         if abs(factor - 1.0) <= 0.02:
             return candidate
         speed = 1.0 / max(0.4, min(2.5, factor))
