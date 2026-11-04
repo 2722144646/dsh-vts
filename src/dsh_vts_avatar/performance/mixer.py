@@ -289,6 +289,8 @@ class PerformanceMixer:
         funnel = 0.0
         pucker = 0.0
         phoneme = (segment.phoneme or "").lower()
+        mouth_phoneme = (mouth_segment.phoneme or "").lower()
+        bilabial_phone = mouth_phoneme in {"p", "b", "m"}
         if segment.kind == "vowel":
             if segment.viseme == "O":
                 funnel = 0.65
@@ -310,8 +312,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.012 if mouth_segment.kind == "consonant" else 0.025,
-                0.035 if mouth_segment.kind == "consonant" else 0.080,
+                0.008 if bilabial_phone else (0.012 if mouth_segment.kind == "consonant" else 0.025),
+                0.015 if bilabial_phone else (0.035 if mouth_segment.kind == "consonant" else 0.080),
             )
         if self._mouth_backend in ("vowel", "hybrid"):
             # Always write all five voice params. Previously a consonant
@@ -333,8 +335,8 @@ class PerformanceMixer:
                 a.mouth_open,
                 mouth_open * mouth_gain,
                 dt,
-                0.012 if mouth_segment.kind == "consonant" else 0.025,
-                0.035 if mouth_segment.kind == "consonant" else 0.080,
+                0.008 if bilabial_phone else (0.012 if mouth_segment.kind == "consonant" else 0.025),
+                0.015 if bilabial_phone else (0.035 if mouth_segment.kind == "consonant" else 0.080),
             )
         if self.profile is not None:
             if self.profile.has(a.jaw_open):
