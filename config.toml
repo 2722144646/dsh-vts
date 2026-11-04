@@ -22,7 +22,7 @@ voice_config = "models/feiyu_distill_v8_final.onnx.json"
 language = "zh"
 length_scale = 0.80
 sentence_silence = 0.08
-postprocess = true
+postprocess = false
 ffmpeg_path = "D:/ruanjian/oopz/ffmpeg.exe"
 # Distill wrapper is intentionally disabled: v8 is used as the native Piper
 # voice so no atempo stretching is applied.
