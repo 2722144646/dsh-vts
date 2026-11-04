@@ -1,6 +1,7 @@
 """Measure distilled voice latency, reference-fit factor, and exact duration."""
 
 from dataclasses import replace
+import argparse
 import time
 from pathlib import Path
 
@@ -23,6 +24,17 @@ TEXTS = [
 ]
 
 cfg = load_config("dsh-vts-avatar/config.toml")
+parser = argparse.ArgumentParser()
+parser.add_argument("--candidate", type=Path)
+parser.add_argument("--length-scale", type=float, default=0.61)
+args = parser.parse_args()
+if args.candidate is not None:
+    cfg.tts = replace(
+        cfg.tts,
+        distill_model=args.candidate,
+        distill_voice_config=args.candidate.with_suffix(".onnx.json"),
+        distill_length_scale=args.length_scale,
+    )
 tts = DistilledPiperTTS(cfg.tts)
 tts.load()
 latencies = []
