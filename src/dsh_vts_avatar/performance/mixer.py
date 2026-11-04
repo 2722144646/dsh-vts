@@ -107,6 +107,13 @@ class PerformanceMixer:
         self._speech_target = 0.0
         self._last_turn_sample = -10**9
         self._mouth_backend = self._decide_backend()
+        self._head_pose = {"x": 0.0, "y": 0.0, "z": 0.0}
+        self._head_pose_until = 0.0
+
+    def set_head_pose(self, yaw: float = 0.0, pitch: float = 0.0, roll: float = 0.0, seconds: float = 8.0) -> None:
+        """Temporary inspection pose; does not alter idle/action behavior."""
+        self._head_pose = {"x": float(yaw), "y": float(pitch), "z": float(roll)}
+        self._head_pose_until = time.perf_counter() + max(0.5, float(seconds))
 
     def _decide_backend(self) -> str:
         requested = (self.avatar.mouth_backend or "auto").lower()
@@ -642,6 +649,10 @@ class PerformanceMixer:
         x += expression_head.get("yaw", 0.0) * strength
         y += expression_head.get("pitch", 0.0) * strength
         z += expression_head.get("roll", 0.0) * strength
+        if now < self._head_pose_until:
+            x += self._head_pose["x"]
+            y += self._head_pose["y"]
+            z += self._head_pose["z"]
         return {"x": x * gain, "y": y * gain, "z": z * gain}
 
     def _update_state_bias(self, dt: float) -> None:

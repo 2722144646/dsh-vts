@@ -589,6 +589,12 @@ class AvatarEngine:
             "viseme": segment.viseme if segment else None,
         }
 
+    def set_head_pose(self, yaw: float = 0.0, pitch: float = 0.0, roll: float = 0.0, seconds: float = 8.0) -> bool:
+        if self.mixer is None:
+            return False
+        self.mixer.set_head_pose(yaw, pitch, roll, seconds)
+        return True
+
     def status(self) -> dict[str, Any]:
         return {
             "vts_connected": self.vts.connected,
