@@ -68,7 +68,6 @@ class AudioEngine:
         self._stream = None
         self._running = False
         self._latency_samples = 0
-        self._dac_anchor: tuple[float, float] | None = None
         self._last_underrun_log = 0.0
 
     def _device_name(self, device: int | None) -> str:
@@ -154,7 +153,7 @@ class AudioEngine:
             self.config.av_offset_ms,
         )
 
-    def _callback(self, outdata, frames, time_info, status) -> None:
+    def _callback(self, outdata, frames, _time_info, status) -> None:
         if status:
             # Avoid log spam during underruns.
             now = time.perf_counter()
@@ -162,7 +161,6 @@ class AudioEngine:
                 self._last_underrun_log = now
                 self.log.warning("audio callback status: %s", status)
         with self._lock:
-            source_start = self._cursor * self.source_rate / self.sample_rate
             end = self._cursor + frames
             chunk = self._audio[self._cursor:end]
             if chunk.size < frames:
@@ -172,17 +170,6 @@ class AudioEngine:
                 outdata[:, 0] = chunk
             self._cursor = min(end, self._audio.size)
             self._frames_consumed += frames
-            # PortAudio gives the DAC time for the start of this buffer. Anchor
-            # the source sample to that future wall-clock instant instead of
-            # trusting stream.latency, which is often badly wrong on MME.
-            try:
-                dac_time = float(time_info.outputBufferDacTime)
-                current_time = float(time_info.currentTime)
-                if dac_time > 0 and current_time >= 0:
-                    wall_dac = time.perf_counter() + max(0.0, dac_time - current_time)
-                    self._dac_anchor = (wall_dac, source_start)
-            except (AttributeError, TypeError, ValueError):
-                pass
 
     def append(self, audio: np.ndarray) -> None:
         data = _resample(audio, self.source_rate, self.sample_rate)
@@ -196,7 +183,6 @@ class AudioEngine:
             self._audio = np.zeros(0, dtype=np.float32)
             self._cursor = 0
             self._frames_consumed = 0
-            self._dac_anchor = None
 
     def stop(self) -> None:
         self._running = False
@@ -210,15 +196,8 @@ class AudioEngine:
 
     def now_sample(self) -> int:
         with self._lock:
-            anchor = self._dac_anchor
-            if anchor is not None:
-                wall_dac, source_start = anchor
-                played = source_start + (time.perf_counter() - wall_dac) * self.source_rate
-                played -= self.config.av_offset_ms * self.source_rate / 1000.0
-                limit = self._audio.size * self.source_rate / self.sample_rate
-                return int(max(0.0, min(float(limit), played)))
             played = max(0, self._frames_consumed - self._latency_samples)
-        # Fallback for backends without outputBufferDacTime.
+        # Map audible output samples back to the source timeline.
         if self.sample_rate == self.source_rate:
             return int(played)
         return int(played * self.source_rate / self.sample_rate)
