@@ -20,20 +20,27 @@ allow_add_fallback = false
 voice_model = "models/zh_CN-huayan-medium.onnx"
 voice_config = "models/zh_CN-huayan-medium.onnx.json"
 language = "zh"
-length_scale = 1.15
+length_scale = 1.22
 sentence_silence = 0.08
 postprocess = false
 ffmpeg_path = "D:/ruanjian/oopz/ffmpeg.exe"
-distill_model = "models/feiyu_distill_v7.onnx"
-distill_voice_config = "models/feiyu_distill_v7.onnx.json"
-distill_length_scale = 0.61
+# Distill wrapper is intentionally disabled: v8 is used as the native Piper
+# voice so no atempo stretching is applied.
+# distill_model = "models/feiyu_distill_v7.onnx"
+# distill_voice_config = "models/feiyu_distill_v7.onnx.json"
+# distill_length_scale = 1.22
 
 [audio]
 # Omit `device` to always follow the Windows default output. A hard-coded
 # integer can silently point at a VB-Cable input or a disconnected jack.
 # device = 17
+# WASAPI headphone endpoint. This is the same endpoint used for the current
+# sync test; do not leave the test config and production config divergent.
+device = 19
 sample_rate = 48000
 buffer_ms = 140
+# 0 means "use the audio backend's measured latency". Do not use a manual
+# offset to hide a change in output device or pipeline.
 av_offset_ms = 0
 # Set false to run the VTS performance without audible playback (useful for probing).
 enabled = true
@@ -99,6 +106,19 @@ snapshot_interval_ms = 500
 [bridge]
 host = "127.0.0.1"
 port = 8765
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
