@@ -547,6 +547,9 @@ class AvatarEngine:
         if not self.clock.is_running:
             self.clock.start()
         self.mixer.set_state("speaking")
+        lead_end = next((seg.start for seg in timeline.segments if seg.kind != "silence"), 0)
+        if lead_end > 0:
+            self.mixer.gate_mouth_until(start_sample + lead_end)
         self._pending_gap_s = 0.0
         self._segment_count += 1
         # A small speech emphasis / gesture on selected phrase starts.
