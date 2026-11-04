@@ -70,6 +70,25 @@ class AudioEngine:
         self._latency_samples = 0
         self._last_underrun_log = 0.0
 
+    def _device_name(self, device: int | None) -> str:
+        """Resolve a device name without assuming query_devices returns a dict.
+
+        sounddevice returns a DeviceList when called without a concrete device;
+        that used to crash at the first TTS chunk when the default output was
+        selected dynamically.
+        """
+        try:
+            info = (
+                self._sd.query_devices(device)
+                if device is not None
+                else self._sd.query_devices(kind="output")
+            )
+            if isinstance(info, dict):
+                return str(info.get("name", ""))
+        except Exception:
+            pass
+        return ""
+
     def _pick_device(self) -> int | None:
         if self.config.device is not None:
             try:
@@ -89,7 +108,7 @@ class AudioEngine:
             default = self._sd.default.device
             out = default[1] if isinstance(default, (tuple, list)) else default
             if out is not None and int(out) >= 0:
-                name = str(self._sd.query_devices(out).get("name", ""))
+                name = self._device_name(int(out))
                 if any(token in name.lower() for token in ("bluetooth", "wh-1000", "hands-free")):
                     self.log.warning(
                         "default output looks like Bluetooth (%s); use wired audio for low latency",
@@ -125,7 +144,7 @@ class AudioEngine:
         self.log.info(
             "audio started: device=%s name=%r rate=%d latency=%.1fms av_offset=%dms",
             device,
-            str(self._sd.query_devices(device).get("name", "")),
+            self._device_name(device),
             self.sample_rate,
             latency_s * 1000,
             self.config.av_offset_ms,
