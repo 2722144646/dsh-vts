@@ -16,6 +16,7 @@ from ..audio.engine import Clock, make_clock
 from ..config import Config
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
+from ..performance.mouth_monitor import MouthMonitor
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
 from ..tts.distill import DistilledPiperTTS
@@ -65,6 +66,7 @@ class AvatarEngine:
         self._recording = False
         self._last_params: dict[str, float] = {}
         self._speech_generation = 0
+        self.mouth_monitor = MouthMonitor()
         self.rvc = RVCConverter(config.rvc)
 
     # -- lifecycle ---------------------------------------------------------
@@ -413,6 +415,7 @@ class AvatarEngine:
         self._parts.clear()
         self.timeline = None
         self._last_sample = 0
+        self.mouth_monitor.reset()
         if self.clock is not None:
             self.clock.clear()
         if self.mixer is not None:
@@ -569,6 +572,19 @@ class AvatarEngine:
                 self._last_sample = sample
                 params = self.mixer.compute(sample, self.timeline, now)
                 self._last_params = params
+                if self.timeline is not None:
+                    mouth_segment = self.timeline.at(sample)
+                    audible = self.timeline.rms_at(sample) > 0.01 or (
+                        mouth_segment.kind != "silence" and mouth_segment.open > 0.02
+                    )
+                else:
+                    audible = False
+                self.mouth_monitor.observe(
+                    now,
+                    params,
+                    speaking=self.mixer.state == "speaking",
+                    audible=audible,
+                )
                 if self.vts.authenticated and params:
                     try:
                         await self.vts.inject(params)
@@ -629,6 +645,8 @@ class AvatarEngine:
             "params": dict(self._last_params),
             "phoneme": segment.phoneme if segment else None,
             "viseme": segment.viseme if segment else None,
+            "mouth_stuck": self.mouth_monitor.stuck,
+            "mouth_activity": round(self.mouth_monitor.activity, 4),
         }
 
     def set_head_pose(self, yaw: float = 0.0, pitch: float = 0.0, roll: float = 0.0, seconds: float = 8.0) -> bool:
@@ -647,6 +665,8 @@ class AvatarEngine:
             "state": self.mixer.state if self.mixer else "idle",
             "sample": self._last_sample,
             "last_error": self._last_error,
+            "mouth_stuck": self.mouth_monitor.stuck,
+            "mouth_activity": round(self.mouth_monitor.activity, 4),
             "ndi_connected": self.ndi is not None,
             "last_ndi": self._last_ndi.__dict__ if self._last_ndi is not None else None,
             "contract": str(self.config.contract_path),
