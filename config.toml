@@ -21,7 +21,7 @@ voice_model = "models/feiyu_distill_v8_final.onnx"
 voice_config = "models/feiyu_distill_v8_final.onnx.json"
 language = "zh"
 length_scale = 1.20
-sentence_silence = 0.08
+sentence_silence = 0.35
 postprocess = true
 ffmpeg_path = "D:/ruanjian/oopz/ffmpeg.exe"
 noise_scale = 0.50
@@ -43,7 +43,7 @@ sample_rate = 48000
 buffer_ms = 140
 # 0 means "use the audio backend's measured latency". Do not use a manual
 # offset to hide a change in output device or pipeline.
-av_offset_ms = 0
+av_offset_ms = 210
 # Set false to run the VTS performance without audible playback (useful for probing).
 enabled = true
 
@@ -108,6 +108,8 @@ snapshot_interval_ms = 500
 [bridge]
 host = "127.0.0.1"
 port = 8765
+
+
 
 
 
