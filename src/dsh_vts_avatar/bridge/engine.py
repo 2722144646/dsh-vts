@@ -18,6 +18,7 @@ from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
+from ..tts.distill import DistilledPiperTTS
 from ..tts.rvc import RVCConverter
 from ..tts.timeline import Timeline
 from ..vts.client import VTSClient, VTSError
@@ -97,6 +98,17 @@ class AvatarEngine:
         )
 
     def _load_tts(self) -> None:
+        if self.config.tts.distill_model is not None:
+            distilled = DistilledPiperTTS(self.config.tts)
+            if distilled.available:
+                try:
+                    distilled.load()
+                    self.tts = distilled
+                    log.info("using distilled Piper TTS at %d Hz", distilled.sample_rate)
+                    return
+                except Exception as exc:
+                    self._last_error = f"Distilled Piper unavailable: {exc}"
+                    log.warning("%s; falling back to reference Piper", self._last_error)
         piper = PiperTTS(self.config.tts)
         if piper.available:
             try:

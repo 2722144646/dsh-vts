@@ -22,8 +22,11 @@ voice_config = "models/zh_CN-huayan-medium.onnx.json"
 language = "zh"
 length_scale = 1.15
 sentence_silence = 0.08
-postprocess = true
+postprocess = false
 ffmpeg_path = "D:/ruanjian/oopz/ffmpeg.exe"
+distill_model = "models/feiyu_distill_v6.onnx"
+distill_voice_config = "models/feiyu_distill_v6.onnx.json"
+distill_length_scale = 0.61
 
 [audio]
 # Omit `device` to always follow the Windows default output. A hard-coded
@@ -96,4 +99,5 @@ snapshot_interval_ms = 500
 [bridge]
 host = "127.0.0.1"
 port = 8765
+
 
