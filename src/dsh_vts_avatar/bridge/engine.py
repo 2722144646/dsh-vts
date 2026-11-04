@@ -550,8 +550,9 @@ class AvatarEngine:
         lead_end = next((seg.start for seg in timeline.segments if seg.kind != "silence"), 0)
         if lead_end > 0:
             # Gate only the sentence lead-in; keep the global clock untouched.
-            lead_end += int(0.07 * timeline.sample_rate)
-            self.mixer.gate_mouth_until(start_sample + lead_end)
+            gate_start = start_sample
+            gate_end = gate_start + lead_end + int(0.07 * timeline.sample_rate)
+            self.mixer.gate_mouth(gate_start, gate_end)
         self._pending_gap_s = 0.0
         self._segment_count += 1
         # A small speech emphasis / gesture on selected phrase starts.

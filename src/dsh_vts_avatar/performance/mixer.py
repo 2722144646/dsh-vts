@@ -106,7 +106,7 @@ class PerformanceMixer:
         self._speech_blend = 0.0
         self._speech_target = 0.0
         self._last_turn_sample = -10**9
-        self._mouth_gate_until_sample = -1
+        self._mouth_gates: list[tuple[int, int]] = []
         self._mouth_backend = self._decide_backend()
 
     def _decide_backend(self) -> str:
@@ -124,9 +124,10 @@ class PerformanceMixer:
         self.state = state
         self._speech_target = 1.0 if state == "speaking" else 0.0
 
-    def gate_mouth_until(self, sample: int) -> None:
+    def gate_mouth(self, start: int, end: int) -> None:
         """Keep the mouth closed through a new sentence's leading silence."""
-        self._mouth_gate_until_sample = max(self._mouth_gate_until_sample, int(sample))
+        if end > start:
+            self._mouth_gates.append((int(start), int(end)))
 
     def set_profile(self, profile: ModelProfile | None, backend: str | None = None) -> None:
         self.profile = profile
@@ -226,7 +227,8 @@ class PerformanceMixer:
             if timeline is not None
             else None
         )
-        if sample < self._mouth_gate_until_sample:
+        self._mouth_gates = [(start, end) for start, end in self._mouth_gates if end > sample]
+        if any(start <= sample < end for start, end in self._mouth_gates):
             # A new sentence can start with 100-250ms of TTS silence. Hold the
             # mouth closed through that lead-in so it cannot open before sound.
             segment = _silence()
