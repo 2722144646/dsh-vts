@@ -48,6 +48,8 @@ class AudioConfig:
     sample_rate: int = 48000
     buffer_ms: int = 140
     av_offset_ms: int = 0
+    auto_calibrate: bool = True
+    calibration_volume: float = 0.18
     enabled: bool = True
 
 
@@ -216,6 +218,8 @@ def load_config(path: str | Path | None = None) -> Config:
         sample_rate=int(audio_raw.get("sample_rate", 48000)),
         buffer_ms=int(audio_raw.get("buffer_ms", 140)),
         av_offset_ms=int(audio_raw.get("av_offset_ms", 0)),
+        auto_calibrate=bool(audio_raw.get("auto_calibrate", True)),
+        calibration_volume=float(audio_raw.get("calibration_volume", 0.18)),
         enabled=bool(audio_raw.get("enabled", True)),
     )
     cfg.avatar = AvatarConfig(

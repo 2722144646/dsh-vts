@@ -89,6 +89,8 @@ class AvatarEngine:
         self._queue = asyncio.Queue(maxsize=16)
         self._worker = asyncio.create_task(self._synth_worker(), name="avatar-tts")
         await self._connect_vts()
+        if self.config.audio.auto_calibrate and hasattr(self.clock, "calibrate_output_latency"):
+            await asyncio.to_thread(self.clock.calibrate_output_latency)
         self._open_ndi()
         self._ticker = asyncio.create_task(self._tick_loop(), name="avatar-tick")
         await self._emit(

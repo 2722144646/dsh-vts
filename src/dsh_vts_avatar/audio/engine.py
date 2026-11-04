@@ -68,6 +68,7 @@ class AudioEngine:
         self._stream = None
         self._running = False
         self._latency_samples = 0
+        self._auto_latency_ms = 0.0
         self._last_underrun_log = 0.0
 
     def _device_name(self, device: int | None) -> str:
@@ -152,6 +153,81 @@ class AudioEngine:
             latency_s * 1000,
             self.config.av_offset_ms,
         )
+
+    def calibrate_output_latency(self) -> float | None:
+        """Measure this output endpoint once with a quiet click + loopback.
+
+        This replaces the old hard-coded 70ms estimate. It runs after VTS
+        authentication, before the first utterance, and falls back to the
+        driver-reported latency if loopback is unavailable.
+        """
+        try:
+            import soundcard as sc
+        except Exception as exc:
+            self.log.warning("auto latency calibration unavailable: %s", exc)
+            return None
+        try:
+            speaker = sc.default_speaker()
+            mic = sc.get_microphone(speaker.name, include_loopback=True)
+        except Exception as exc:
+            self.log.warning("auto latency calibration: no loopback: %s", exc)
+            return None
+
+        # Warm the output stream first. Starting the stream inside the timed
+        # click adds device startup latency and overestimates the steady-state
+        # playback latency.
+        if not self.is_running:
+            self.start()
+            time.sleep(0.25)
+
+        recorded: dict[str, object] = {}
+
+        def record() -> None:
+            import ctypes
+
+            try:
+                ctypes.windll.ole32.CoInitializeEx(None, 0x2)
+            except Exception:
+                pass
+            try:
+                with mic.recorder(samplerate=self.sample_rate, channels=1) as recorder:
+                    recorded["start"] = time.perf_counter()
+                    recorded["audio"] = np.asarray(
+                        recorder.record(numframes=int(self.sample_rate * 1.2))
+                    ).reshape(-1)
+            finally:
+                try:
+                    ctypes.windll.ole32.CoUninitialize()
+                except Exception:
+                    pass
+
+        thread = threading.Thread(target=record, name="latency-loopback")
+        thread.start()
+        time.sleep(0.12)
+        self.clear()
+        click = np.zeros(int(self.source_rate * 0.05), dtype=np.float32)
+        tone = np.sin(2 * np.pi * 1000 * np.arange(int(self.source_rate * 0.03)) / self.source_rate)
+        click[: tone.size] = (tone * self.config.calibration_volume).astype(np.float32)
+        t0 = time.perf_counter()
+        self.append(click)
+        if not self.is_running:
+            self.start()
+        thread.join()
+        audio = np.asarray(recorded.get("audio", np.zeros(0)), dtype=np.float32)
+        record_start = float(recorded.get("start", t0))
+        self.clear()
+        if audio.size == 0:
+            self.log.warning("auto latency calibration: empty loopback")
+            return None
+        index = int(np.argmax(np.abs(audio)))
+        delay_ms = (record_start + index / self.sample_rate - t0) * 1000.0
+        if not 15.0 <= delay_ms <= 500.0:
+            self.log.warning("auto latency calibration rejected: %.1fms", delay_ms)
+            return None
+        self._auto_latency_ms = delay_ms
+        self._latency_samples = int(delay_ms * self.sample_rate / 1000.0)
+        self.log.info("auto latency calibration: %.1fms (replaces driver estimate)", delay_ms)
+        return delay_ms
 
     def _callback(self, outdata, frames, _time_info, status) -> None:
         if status:
