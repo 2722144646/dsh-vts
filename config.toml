@@ -40,7 +40,7 @@ sample_rate = 48000
 buffer_ms = 140
 # Positive value delays the avatar mouth; Bluetooth headphones report less
 # latency than they actually have, so start with a small positive offset.
-av_offset_ms = 80
+av_offset_ms = 100
 # Set false to run the VTS performance without audible playback (useful for probing).
 enabled = true
 
