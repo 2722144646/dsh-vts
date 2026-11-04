@@ -504,15 +504,23 @@ class PerformanceMixer:
             # Keep bilabial closures crisp; blending a neighbouring vowel into
             # a 10-30ms /p/ or /m/ makes it look like the mouth never closes.
             return base
-        pre = max(1, int(self.sample_rate * 0.030))
-        post = max(1, int(self.sample_rate * 0.020))
+        pre = max(1, int(self.sample_rate * (0.045 if current.kind == "vowel" else 0.030)))
+        post = max(1, int(self.sample_rate * (0.030 if current.kind == "vowel" else 0.020)))
         if index > 0 and sample - current.start < pre:
-            previous = self._speech(timeline.segments[index - 1], env)
-            weight = 0.35 * (1.0 - (sample - current.start) / pre)
+            previous_segment = timeline.segments[index - 1]
+            previous = self._speech(previous_segment, env)
+            # Chinese diphthongs often arrive as two adjacent vowels (a+i,
+            # e+i, a+o). Give that boundary a wider, stronger blend than a
+            # normal consonant-to-vowel transition so the mouth glides instead
+            # of stepping from one viseme to the next.
+            peak = 0.50 if current.kind == "vowel" and previous_segment.kind == "vowel" else 0.35
+            weight = peak * (1.0 - (sample - current.start) / pre)
             return self._blend_speech(previous, base, 1.0 - weight)
         if index + 1 < len(timeline.segments) and current.end - sample < post:
-            following = self._speech(timeline.segments[index + 1], env)
-            weight = 0.35 * (1.0 - (current.end - sample) / post)
+            following_segment = timeline.segments[index + 1]
+            following = self._speech(following_segment, env)
+            peak = 0.50 if current.kind == "vowel" and following_segment.kind == "vowel" else 0.35
+            weight = peak * (1.0 - (current.end - sample) / post)
             return self._blend_speech(base, following, weight)
         return base
 
