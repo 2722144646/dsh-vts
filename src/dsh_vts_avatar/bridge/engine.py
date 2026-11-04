@@ -547,7 +547,7 @@ class AvatarEngine:
         if not self.clock.is_running:
             self.clock.start()
         self.mixer.set_state("speaking")
-        self._pending_gap_s = 0.006 if text.rstrip().endswith(("。", "！", "？", ".", "!", "?")) else 0.0
+        self._pending_gap_s = 0.0
         self._segment_count += 1
         # A small speech emphasis / gesture on selected phrase starts.
         if text and self.segmenter_gesture_rate > 0:
