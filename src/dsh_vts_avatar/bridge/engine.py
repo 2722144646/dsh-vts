@@ -64,6 +64,7 @@ class AvatarEngine:
         self._model_refreshing = False
         self._recording = False
         self._last_params: dict[str, float] = {}
+        self._speech_generation = 0
         self.rvc = RVCConverter(config.rvc)
 
     # -- lifecycle ---------------------------------------------------------
@@ -368,6 +369,7 @@ class AvatarEngine:
                 pass
 
     async def cancel(self) -> None:
+        self._speech_generation += 1
         if self._queue is not None:
             while not self._queue.empty():
                 try:
@@ -377,6 +379,7 @@ class AvatarEngine:
                     break
         self._parts.clear()
         self.timeline = None
+        self._last_sample = 0
         if self.clock is not None:
             self.clock.clear()
         if self.mixer is not None:
@@ -454,12 +457,18 @@ class AvatarEngine:
         assert self._queue is not None
         while not self._closing:
             text = await self._queue.get()
+            generation = self._speech_generation
             try:
                 started = time.perf_counter()
                 assert self.tts is not None
                 timeline = await asyncio.to_thread(self.tts.synthesize, text)
                 if self.rvc.enabled:
                     timeline = await asyncio.to_thread(self.rvc.convert, timeline, text)
+                if generation != self._speech_generation:
+                    # The user cancelled/began another utterance while this
+                    # synthesis was in flight. Never append stale speech.
+                    log.info("discarding stale TTS result")
+                    continue
                 self._last_tts_ms = (time.perf_counter() - started) * 1000.0
                 self._append_timeline(timeline, text)
             except Exception as exc:
