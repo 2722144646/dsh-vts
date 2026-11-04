@@ -64,7 +64,7 @@ class PiperTTS:
         from piper.config import SynthesisConfig
 
         synth_config = SynthesisConfig(
-            length_scale=max(0.7, min(1.6, float(self.config.length_scale))),
+            length_scale=max(0.30, min(3.0, float(self.config.length_scale))),
             normalize_audio=True,
         )
         timelines: list[Timeline] = []
