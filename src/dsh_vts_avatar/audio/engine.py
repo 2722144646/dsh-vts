@@ -250,14 +250,15 @@ class AudioEngine:
                 return cached
             self.log.warning("auto latency calibration unstable; keeping driver estimate")
             return None
-        delay_ms = float(np.median(delays))
+        delay_ms = float(np.median(delays)) + float(self.config.sync_correction_ms)
         self._auto_latency_ms = delay_ms
         self._latency_samples = int(delay_ms * self.sample_rate / 1000.0)
         self._write_cached_latency(delay_ms)
         self.log.info(
-            "auto latency calibration: %.1fms (median of %d, replaces driver estimate)",
+            "auto latency calibration: %.1fms (median of %d + %.1fms correction, replaces driver estimate)",
             delay_ms,
             len(delays),
+            self.config.sync_correction_ms,
         )
         return delay_ms
 
