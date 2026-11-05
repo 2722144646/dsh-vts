@@ -50,6 +50,7 @@ class AudioConfig:
     av_offset_ms: int = 0
     auto_calibrate: bool = True
     calibration_volume: float = 0.18
+    sync_correction_ms: float = 0.0
     enabled: bool = True
 
 
@@ -220,6 +221,7 @@ def load_config(path: str | Path | None = None) -> Config:
         av_offset_ms=int(audio_raw.get("av_offset_ms", 0)),
         auto_calibrate=bool(audio_raw.get("auto_calibrate", True)),
         calibration_volume=float(audio_raw.get("calibration_volume", 0.18)),
+        sync_correction_ms=float(audio_raw.get("sync_correction_ms", 0.0)),
         enabled=bool(audio_raw.get("enabled", True)),
     )
     cfg.avatar = AvatarConfig(

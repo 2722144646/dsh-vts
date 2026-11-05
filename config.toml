@@ -46,6 +46,7 @@ buffer_ms = 140
 av_offset_ms = 0
 auto_calibrate = true
 calibration_volume = 0.18
+sync_correction_ms = 295.0
 # Set false to run the VTS performance without audible playback (useful for probing).
 enabled = true
 
@@ -110,6 +111,8 @@ snapshot_interval_ms = 500
 [bridge]
 host = "127.0.0.1"
 port = 8765
+
+
 
 
 
