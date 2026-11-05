@@ -6,9 +6,11 @@ engine where the *audible* sample is, then looks up the corresponding phoneme.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -201,33 +203,95 @@ class AudioEngine:
                 except Exception:
                     pass
 
-        thread = threading.Thread(target=record, name="latency-loopback")
-        thread.start()
-        time.sleep(0.12)
-        self.clear()
-        click = np.zeros(int(self.source_rate * 0.05), dtype=np.float32)
-        tone = np.sin(2 * np.pi * 1000 * np.arange(int(self.source_rate * 0.03)) / self.source_rate)
-        click[: tone.size] = (tone * self.config.calibration_volume).astype(np.float32)
-        t0 = time.perf_counter()
-        self.append(click)
-        if not self.is_running:
-            self.start()
-        thread.join()
-        audio = np.asarray(recorded.get("audio", np.zeros(0)), dtype=np.float32)
-        record_start = float(recorded.get("start", t0))
-        self.clear()
-        if audio.size == 0:
-            self.log.warning("auto latency calibration: empty loopback")
+        delays: list[float] = []
+        for attempt in range(3):
+            recorded.clear()
+            thread = threading.Thread(target=record, name=f"latency-loopback-{attempt}")
+            thread.start()
+            time.sleep(0.12)
+            self.clear()
+            click = np.zeros(int(self.source_rate * 0.05), dtype=np.float32)
+            tone = np.sin(2 * np.pi * 1000 * np.arange(int(self.source_rate * 0.03)) / self.source_rate)
+            click[: tone.size] = (tone * self.config.calibration_volume).astype(np.float32)
+            t0 = time.perf_counter()
+            self.append(click)
+            if not self.is_running:
+                self.start()
+            thread.join()
+            audio = np.asarray(recorded.get("audio", np.zeros(0)), dtype=np.float32)
+            record_start = float(recorded.get("start", t0))
+            self.clear()
+            if audio.size == 0 or float(np.max(np.abs(audio))) < 0.005:
+                self.log.warning("auto latency calibration attempt %d: no click", attempt + 1)
+                continue
+            index = int(np.argmax(np.abs(audio)))
+            delay_ms = (record_start + index / self.sample_rate - t0) * 1000.0
+            if 15.0 <= delay_ms <= 500.0:
+                delays.append(delay_ms)
+            else:
+                self.log.warning(
+                    "auto latency calibration attempt %d rejected: %.1fms", attempt + 1, delay_ms
+                )
+        if not delays:
+            cached = self._read_cached_latency()
+            if cached is not None:
+                self._auto_latency_ms = cached
+                self._latency_samples = int(cached * self.sample_rate / 1000.0)
+                self.log.warning("auto latency calibration failed; using cached %.1fms", cached)
+                return cached
+            self.log.warning("auto latency calibration failed; keeping driver estimate")
             return None
-        index = int(np.argmax(np.abs(audio)))
-        delay_ms = (record_start + index / self.sample_rate - t0) * 1000.0
-        if not 15.0 <= delay_ms <= 500.0:
-            self.log.warning("auto latency calibration rejected: %.1fms", delay_ms)
+        if len(delays) < 2 or max(delays) - min(delays) > 30.0:
+            cached = self._read_cached_latency()
+            if cached is not None:
+                self._auto_latency_ms = cached
+                self._latency_samples = int(cached * self.sample_rate / 1000.0)
+                self.log.warning("auto latency calibration unstable; using cached %.1fms", cached)
+                return cached
+            self.log.warning("auto latency calibration unstable; keeping driver estimate")
             return None
+        delay_ms = float(np.median(delays))
         self._auto_latency_ms = delay_ms
         self._latency_samples = int(delay_ms * self.sample_rate / 1000.0)
-        self.log.info("auto latency calibration: %.1fms (replaces driver estimate)", delay_ms)
+        self._write_cached_latency(delay_ms)
+        self.log.info(
+            "auto latency calibration: %.1fms (median of %d, replaces driver estimate)",
+            delay_ms,
+            len(delays),
+        )
         return delay_ms
+
+    @staticmethod
+    def _latency_cache_path() -> Path:
+        return Path(__file__).resolve().parents[3] / "data" / "audio_latency.json"
+
+    def _read_cached_latency(self) -> float | None:
+        try:
+            data = json.loads(self._latency_cache_path().read_text(encoding="utf-8"))
+            value = float(data.get("latency_ms"))
+            if 15.0 <= value <= 500.0:
+                return value
+        except Exception:
+            pass
+        return None
+
+    def _write_cached_latency(self, value: float) -> None:
+        try:
+            path = self._latency_cache_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(
+                    {
+                        "latency_ms": round(float(value), 1),
+                        "updated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            self.log.warning("could not cache latency: %s", exc)
 
     def _callback(self, outdata, frames, _time_info, status) -> None:
         if status:
