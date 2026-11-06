@@ -14,6 +14,7 @@ from .composer import (
     compose_face,
     compose_head,
 )
+from .fusion import SOURCE_WEIGHTS, AffectFusion, FusionSettings
 from .log import AffectLog, read_log
 from .presets import (
     ANCHORS,
@@ -36,9 +37,11 @@ from .schema import (
 __all__ = [
     "ANCHORS",
     "AffectEvidence",
+    "AffectFusion",
     "AffectLog",
     "AffectState",
     "FACE_KEYS",
+    "FusionSettings",
     "HEAD_KEYS",
     "LABEL_ALIASES",
     "LEGACY_LABELS",
@@ -46,6 +49,7 @@ __all__ = [
     "NEUTRAL_HEAD",
     "NEUTRAL_LABELS",
     "SOURCES",
+    "SOURCE_WEIGHTS",
     "UNKNOWN_ANCHOR",
     "anchor",
     "blend_face",
