@@ -16,7 +16,7 @@ from ..audio.engine import Clock, make_clock
 from ..config import Config
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
-from ..performance.affect import AffectEvidence, AffectState
+from ..performance.affect import AffectEvidence, AffectLog, AffectState
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
@@ -71,6 +71,9 @@ class AvatarEngine:
         self._speech_generation = 0
         self.mouth_monitor = MouthMonitor()
         self.rvc = RVCConverter(config.rvc)
+        # Phase 1/3: append-only record of every evidence record and the state
+        # it produced, so a session can be replayed and audited later.
+        self.affect_log = AffectLog(config.root / "data" / "affect")
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -92,7 +95,7 @@ class AvatarEngine:
         self._queue = asyncio.Queue(maxsize=16)
         self._worker = asyncio.create_task(self._synth_worker(), name="avatar-tts")
         await self._connect_vts()
-        self._watcher = asyncio.create_task(self._vts_watchdog(), name="avatar-vts-watchdog")
+        self._watcher = asyncio.create_task(self._vts_watchdog(), name="avatar-vts-startup-check")
         if self.config.audio.auto_calibrate and hasattr(self.clock, "calibrate_output_latency"):
             await asyncio.to_thread(self.clock.calibrate_output_latency)
         self._open_ndi()
@@ -189,42 +192,30 @@ class AvatarEngine:
         return False
 
     async def _vts_watchdog(self) -> None:
-        """Own reconnection so a VTS restart does not need a bridge restart.
+        """One startup check, then leave the connection alone.
 
-        The 30 Hz loop only injects while authenticated; previously a keepalive
-        timeout left the engine believing it was still connected and the avatar
-        silently stopped moving until the bridge was restarted by hand.
+        Same policy as the audio calibration: probe once when the bridge
+        starts (including a VTS API port that moved), and do not poll. A later
+        VTS restart is re-attached by the explicit ``reconnect`` message.
         """
-        delay = 2.0
-        while not self._closing:
-            await asyncio.sleep(delay)
-            if self._closing:
-                return
-            if self._recording:
-                delay = 2.0
-                continue
-            if self.vts.connected and self.vts.authenticated:
-                delay = 2.0
-                continue
-            log.info("VTS watchdog: connection lost, reconnecting")
-            try:
-                await self.vts.close()
-            except Exception:
-                pass
-            try:
-                if await self._connect_vts():
-                    self._last_error = ""
-                    log.info("VTS watchdog: reconnected")
-                    await self._emit(
-                        {"type": "vts.reconnected", "profile": self.profile.summary()}
-                    )
-                    delay = 2.0
-                else:
-                    delay = min(15.0, delay * 1.6)
-            except Exception as exc:
-                self._last_error = f"VTS reconnect failed: {exc}"
-                log.warning(self._last_error)
-                delay = min(15.0, delay * 1.6)
+        await asyncio.sleep(3.0)
+        if self._closing or self._recording:
+            return
+        if self.vts.connected and self.vts.authenticated:
+            return
+        log.info("VTS startup check: connection lost, reconnecting once")
+        try:
+            await self.vts.close()
+        except Exception:
+            pass
+        try:
+            if await self._connect_vts():
+                self._last_error = ""
+                log.info("VTS startup check: reconnected")
+                await self._emit({"type": "vts.reconnected", "profile": self.profile.summary()})
+        except Exception as exc:
+            self._last_error = f"VTS reconnect failed: {exc}"
+            log.warning(self._last_error)
 
     async def _query_profile(self) -> ModelProfile:
         """Build a model profile from the live VTS parameter lists.
@@ -542,7 +533,67 @@ class AvatarEngine:
             intensity=intensity,
             confidence=confidence,
         )
-        self.mixer.set_affect(AffectState.from_evidence(evidence))
+        state = AffectState.from_evidence(evidence)
+        self.affect_log.evidence(evidence)
+        self.affect_log.state(state, applied=True)
+        self.mixer.set_affect(state)
+
+    def feel(
+        self,
+        labels: dict[str, float] | None = None,
+        intensity: float = 0.7,
+        confidence: float = 0.8,
+        note: str = "",
+        turn_id: str = "",
+    ) -> dict[str, Any]:
+        """Describe the current emotional state (Phase 3).
+
+        ``labels`` is a weighted vocabulary (``{"happy": 0.6, "tired": 0.4}``),
+        not a preset name. In ``affect`` mode it becomes one evidence record and
+        the composer blends it; in ``legacy`` mode it degrades to the dominant
+        preset so old behavior and old logs stay comparable.
+        """
+        evidence = AffectEvidence(
+            source="tool",
+            labels=dict(labels or {}),
+            intensity=intensity,
+            confidence=confidence,
+            note=note,
+            turn_id=turn_id,
+        )
+        state = AffectState.from_evidence(evidence)
+        self.affect_log.evidence(evidence)
+        if self.mixer is None:
+            self.affect_log.state(state, applied=False)
+            return {"ok": False, "error": "mixer not ready", "labels": state.labels}
+
+        if self.config.emotion.is_affect:
+            # A low-confidence reading must not slam the face to full anchor.
+            # Scale the display strength instead of dropping the evidence, so
+            # Phase 4 fusion still sees what was said.
+            state.intensity = evidence.intensity * (0.5 + 0.5 * evidence.confidence)
+            self.affect_log.state(state, applied=True)
+            self.mixer.set_affect(state)
+            dominant, weight = state.dominant()[0]
+            if weight >= 0.5:
+                # Keep the learned-expression/profile path alive; the face
+                # targets themselves come from the composer.
+                self.mixer.set_emotion(dominant, state.intensity)
+        else:
+            dominant, _weight = state.dominant()[0]
+            self.affect_log.state(state, applied=True, mode="legacy")
+            self.mixer.set_emotion(dominant, state.intensity)
+
+        return {
+            "ok": True,
+            "mode": self.config.emotion.mode,
+            "labels": state.labels,
+            "dominant": state.dominant(2),
+            "intensity": round(state.intensity, 4),
+            "confidence": state.confidence,
+            "valence": round(state.valence, 4),
+            "arousal": round(state.arousal, 4),
+        }
 
     async def record_expression(self, name: str, seconds: float = 4.0) -> dict[str, Any]:
         """Read-only capture of a user-performed expression.

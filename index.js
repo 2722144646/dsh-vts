@@ -78,6 +78,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message.summary ?? null);
         }
+      } else if (message.type === 'feel.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'error') {
         console.warn('[vts-avatar] bridge error:', message.code, message.message ?? '');
       }
@@ -353,6 +360,75 @@ export function apply(ctx, config = {}) {
           const sent = client.send({ type: 'emotion', name, intensity });
           if (!sent) return { ok: false, error: 'bridge is not connected' };
           return { ok: true, name, intensity };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_feel',
+        description:
+          'Describe how the avatar feels right now with weighted labels, e.g. {happy: 0.6, tired: 0.4}. ' +
+          'This is a description, not a preset command: mixed labels blend into one face, and a low ' +
+          'confidence value softens the expression instead of snapping to a full preset. ' +
+          'Use vts_avatar_emote only when an exact preset has to be forced.',
+        parameters: {
+          type: 'object',
+          properties: {
+            labels: {
+              type: 'object',
+              description: 'Label weights 0..1, e.g. {"happy":0.6,"tired":0.4}. Keys are emotion words.',
+              additionalProperties: { type: 'number', minimum: 0, maximum: 1 },
+            },
+            intensity: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              description: 'Overall intensity; 0.7 is a good default.',
+            },
+            confidence: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              description: 'How sure you are; low values soften the display instead of hard-switching.',
+            },
+            note: {
+              type: 'string',
+              description: 'Short reason for the affect log only; never spoken.',
+            },
+          },
+          required: ['labels'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => {
+            if (value?.ok === false) {
+              return [{ type: 'text', text: `Avatar feel failed: ${value?.error ?? 'unknown error'}` }];
+            }
+            const dominant = Array.isArray(value?.dominant)
+              ? value.dominant.map(([name, weight]) => `${name} ${Number(weight).toFixed(2)}`).join(', ')
+              : '';
+            return [
+              {
+                type: 'text',
+                text: `Avatar feel applied (${value?.mode ?? 'unknown'}): ${dominant}` +
+                  ` intensity ${value?.intensity ?? '?'}`,
+              },
+            ];
+          },
+        },
+        async execute(args) {
+          const labels = args?.labels && typeof args.labels === 'object' ? args.labels : {};
+          try {
+            const result = await client.request('feel', {
+              labels,
+              intensity: Number(args?.intensity ?? 0.7),
+              confidence: Number(args?.confidence ?? 0.8),
+              note: String(args?.note ?? ''),
+            });
+            return { ...result, ok: result?.ok !== false };
+          } catch (error) {
+            return { ok: false, error: String(error?.message ?? error) };
+          }
         },
       }),
 
