@@ -50,6 +50,46 @@ class VTSMessageError(RuntimeError):
     """Malformed or unexpected VTS response."""
 
 
+async def find_vts_port(
+    host: str,
+    exclude: int | None = None,
+    ports: range | None = None,
+) -> int | None:
+    """Locate VTS after a restart moved its API port.
+
+    VTS reuses the last free port in its configured range; a bridge hard-wired
+    to 8002 goes deaf the moment VTS comes back on 8003. Probe the usual band
+    and only accept a socket that answers ``APIStateRequest``.
+    """
+    candidates = [port for port in (ports or range(8001, 8011)) if port != exclude]
+    payload = orjson.dumps(
+        {
+            "apiName": API_NAME,
+            "apiVersion": API_VERSION,
+            "messageType": "APIStateRequest",
+            "requestID": _new_request_id(),
+        }
+    ).decode("utf-8")
+    for port in candidates:
+        url = f"ws://{host}:{port}"
+        try:
+            async with websockets.connect(
+                url,
+                open_timeout=0.5,
+                close_timeout=0.2,
+                max_size=1024 * 1024,
+            ) as ws:
+                await ws.send(payload)
+                raw = await asyncio.wait_for(ws.recv(), timeout=0.8)
+                message = orjson.loads(raw)
+                if message.get("messageType") == "APIStateResponse":
+                    log.info("VTS found on port %d", port)
+                    return port
+        except Exception:
+            continue
+    return None
+
+
 def _new_request_id() -> str:
     # VTS allows 1..64 ASCII chars.
     return f"dsh-{uuid.uuid4().hex[:24]}"
@@ -131,6 +171,10 @@ class VTSClient:
         except Exception as exc:
             if not self._closed:
                 self.log.warning("VTS receive loop stopped: %s", exc)
+                # The socket is gone even though close() was never called.
+                # Without this the engine would keep believing it can inject.
+                self._closed = True
+                self.authenticated = False
         finally:
             for fut in self._pending.values():
                 if not fut.done():

@@ -23,7 +23,7 @@ from ..tts import PiperTTS, SyntheticTTS
 from ..tts.distill import DistilledPiperTTS
 from ..tts.rvc import RVCConverter
 from ..tts.timeline import Timeline
-from ..vts.client import VTSClient, VTSError
+from ..vts.client import VTSClient, VTSError, find_vts_port
 from ..vts.profile import ModelProfile, load_for_model, profile_path
 from .segmentation import Segmenter
 from .text_filter import SpeechTextFilter
@@ -51,6 +51,7 @@ class AvatarEngine:
         self._queue: asyncio.Queue[str] | None = None
         self._worker: asyncio.Task[None] | None = None
         self._ticker: asyncio.Task[None] | None = None
+        self._watcher: asyncio.Task[None] | None = None
         self._closing = False
         self._utterance_open = False
         self._last_emit = 0.0
@@ -91,6 +92,7 @@ class AvatarEngine:
         self._queue = asyncio.Queue(maxsize=16)
         self._worker = asyncio.create_task(self._synth_worker(), name="avatar-tts")
         await self._connect_vts()
+        self._watcher = asyncio.create_task(self._vts_watchdog(), name="avatar-vts-watchdog")
         if self.config.audio.auto_calibrate and hasattr(self.clock, "calibrate_output_latency"):
             await asyncio.to_thread(self.clock.calibrate_output_latency)
         self._open_ndi()
@@ -147,27 +149,82 @@ class AvatarEngine:
     async def _connect_vts(self) -> bool:
         try:
             await self.vts.connect()
-            self.profile = await self._query_profile()
-            self._model_id = self.profile.model_id
-            if self.mixer is not None:
-                self.mixer.set_profile(
-                    self.profile,
-                    self.profile.choose_mouth_backend(self.config.avatar, "auto"),
-                )
-            log.info("VTS ready: %s", self.profile.summary())
-            return True
         except Exception as exc:
-            self._last_error = str(exc)
-            log.warning("VTS connection failed: %s", exc)
-            await self._emit(
-                {
-                    "type": "error",
-                    "code": "vts_connect_failed",
-                    "message": str(exc),
-                    "retryable": True,
-                }
+            # A VTS restart can re-bind its API on a neighbouring port. Probe
+            # before falling back to the error path; otherwise every restart
+            # silently disconnects the avatar until the bridge is restarted.
+            port = await find_vts_port(self.config.vts.host, exclude=self.config.vts.port)
+            if port is None:
+                return await self._vts_connect_failed(exc)
+            log.info("VTS API port moved %s -> %s", self.config.vts.port, port)
+            self.config.vts.port = port
+            try:
+                await self.vts.connect()
+            except Exception as retry_exc:
+                return await self._vts_connect_failed(retry_exc)
+        try:
+            self.profile = await self._query_profile()
+        except Exception as exc:
+            return await self._vts_connect_failed(exc)
+        self._model_id = self.profile.model_id
+        if self.mixer is not None:
+            self.mixer.set_profile(
+                self.profile,
+                self.profile.choose_mouth_backend(self.config.avatar, "auto"),
             )
-            return False
+        log.info("VTS ready: %s", self.profile.summary())
+        return True
+
+    async def _vts_connect_failed(self, exc: Exception) -> bool:
+        self._last_error = str(exc)
+        log.warning("VTS connection failed: %s", exc)
+        await self._emit(
+            {
+                "type": "error",
+                "code": "vts_connect_failed",
+                "message": str(exc),
+                "retryable": True,
+            }
+        )
+        return False
+
+    async def _vts_watchdog(self) -> None:
+        """Own reconnection so a VTS restart does not need a bridge restart.
+
+        The 30 Hz loop only injects while authenticated; previously a keepalive
+        timeout left the engine believing it was still connected and the avatar
+        silently stopped moving until the bridge was restarted by hand.
+        """
+        delay = 2.0
+        while not self._closing:
+            await asyncio.sleep(delay)
+            if self._closing:
+                return
+            if self._recording:
+                delay = 2.0
+                continue
+            if self.vts.connected and self.vts.authenticated:
+                delay = 2.0
+                continue
+            log.info("VTS watchdog: connection lost, reconnecting")
+            try:
+                await self.vts.close()
+            except Exception:
+                pass
+            try:
+                if await self._connect_vts():
+                    self._last_error = ""
+                    log.info("VTS watchdog: reconnected")
+                    await self._emit(
+                        {"type": "vts.reconnected", "profile": self.profile.summary()}
+                    )
+                    delay = 2.0
+                else:
+                    delay = min(15.0, delay * 1.6)
+            except Exception as exc:
+                self._last_error = f"VTS reconnect failed: {exc}"
+                log.warning(self._last_error)
+                delay = min(15.0, delay * 1.6)
 
     async def _query_profile(self) -> ModelProfile:
         """Build a model profile from the live VTS parameter lists.
@@ -329,7 +386,7 @@ class AvatarEngine:
                     await asyncio.sleep(1.0 / 30.0)
             except Exception:
                 pass
-        for task in (self._ticker, self._worker):
+        for task in (self._ticker, self._worker, self._watcher):
             if task is not None:
                 task.cancel()
                 try:
