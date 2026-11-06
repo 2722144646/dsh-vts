@@ -16,6 +16,7 @@ from ..audio.engine import Clock, make_clock
 from ..config import Config
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
+from ..performance.affect import AffectEvidence, AffectState
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
@@ -84,6 +85,7 @@ class AvatarEngine:
             self.tts.sample_rate,
             profile=self.profile,
             backend=self.profile.choose_mouth_backend(self.config.avatar, "auto"),
+            use_affect=self.config.emotion.is_affect,
         )
         self.mixer.set_state("idle")
         self._queue = asyncio.Queue(maxsize=16)
@@ -364,6 +366,8 @@ class AvatarEngine:
             affect = emotion_from_text(self._affect_buffer)
             if affect:
                 self.mixer.set_emotion(*affect)
+                if self.config.emotion.is_affect:
+                    self._push_affect(affect[0], affect[1])
         clean = strip_emotion_tags(text)
         clean = self.speech_filter.feed(clean)
         if not clean:
@@ -439,6 +443,10 @@ class AvatarEngine:
     def set_emotion(self, name: str, intensity: float = 0.7) -> None:
         if self.mixer is not None:
             self.mixer.set_emotion(name, intensity)
+            if self.config.emotion.is_affect:
+                # A manual instruction is the one source allowed to hard
+                # override; keep it at full confidence.
+                self._push_affect(name, intensity, source="manual", confidence=1.0)
             # Thinking/shy have no fixed standard take yet, but they must
             # still be triggerable. Improvise them from the generic preset
             # plus a combined head/eye/brow action.
@@ -450,6 +458,34 @@ class AvatarEngine:
             }.get(name)
             if gesture and not any(cue.kind == gesture and not cue.finished for cue in self.mixer.actions):
                 self.mixer.add_action(gesture, intensity)
+
+    def _push_affect(
+        self,
+        label: str,
+        intensity: float,
+        *,
+        source: str | None = None,
+        confidence: float | None = None,
+    ) -> None:
+        """Turn one legacy reading into one affect evidence record.
+
+        Phase 2 stays single-source on purpose; Phase 4 is where several
+        evidence records get weighed against each other.
+        """
+        if self.mixer is None or not self.config.emotion.is_affect:
+            return
+        if source is None:
+            markers = ("[emotion", "[情绪", "【情绪")
+            source = "tag" if any(marker in self._affect_buffer for marker in markers) else "keyword"
+        if confidence is None:
+            confidence = 0.9 if source == "tag" else 0.6
+        evidence = AffectEvidence(
+            source=source,
+            labels={label: 1.0},
+            intensity=intensity,
+            confidence=confidence,
+        )
+        self.mixer.set_affect(AffectState.from_evidence(evidence))
 
     async def record_expression(self, name: str, seconds: float = 4.0) -> dict[str, Any]:
         """Read-only capture of a user-performed expression.

@@ -2,12 +2,14 @@ import asyncio
 import json
 from pathlib import Path
 import shutil
+import sys
 
 import cv2
 import websockets
 
 PRESETS = ["happy", "sad", "angry", "surprised", "thinking", "shy", "wronged"]
-OUT = Path("dsh-vts-avatar/data/expression_shots")
+# Optional output directory, e.g. data/expression_shots_affect for an A/B run.
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "data" / "expression_shots"
 
 
 async def main():

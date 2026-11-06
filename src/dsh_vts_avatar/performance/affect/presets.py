@@ -37,8 +37,38 @@ LEGACY_LABELS = tuple(ANCHORS)
 
 
 def anchor(label: str) -> tuple[float, float]:
-    return ANCHORS.get(label, UNKNOWN_ANCHOR)
+    return ANCHORS.get(canonical(label), UNKNOWN_ANCHOR)
 
 
 def is_known(label: str) -> bool:
-    return label in ANCHORS
+    return canonical(label) in ANCHORS
+
+
+# Chinese labels arrive from the manual tool / profile expression_map. Map them
+# onto the same anchors instead of silently falling back to neutral.
+LABEL_ALIASES: dict[str, str] = {
+    "开心": "happy",
+    "快乐": "happy",
+    "高兴": "happy",
+    "难过": "sad",
+    "悲伤": "sad",
+    "委屈": "wronged",
+    "生气": "angry",
+    "愤怒": "angry",
+    "惊讶": "surprised",
+    "吃惊": "surprised",
+    "思考": "thinking",
+    "害羞": "shy",
+    "好奇": "curious",
+    "累": "tired",
+    "疲惫": "tired",
+    "困": "tired",
+    "中性": "neutral",
+    "平静": "calm",
+}
+
+
+def canonical(label: str) -> str:
+    name = str(label or "").strip()
+    lowered = name.lower()
+    return LABEL_ALIASES.get(name) or LABEL_ALIASES.get(lowered) or lowered

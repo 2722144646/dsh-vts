@@ -38,7 +38,9 @@ noise_w_scale = 0.70
 # device = 20
 # WASAPI headphone endpoint. This is the same endpoint used for the current
 # sync test; do not leave the test config and production config divergent.
-device = 20
+# Indices drift whenever the headset is re-plugged. Re-check before every start.
+# 2026-11-06 20:10: 19 = 耳机 (Realtek(R) Audio) [Windows WASAPI], 2 ch.
+device = 19
 sample_rate = 48000
 buffer_ms = 140
 # 0 means "use the audio backend's measured latency". Do not use a manual
@@ -106,7 +108,7 @@ voice_o = "VoiceO"
 # legacy = presets + priority + keyword fallback (v0.5.0 behavior, default)
 # affect = multi-source evidence fusion (emotion refactor Phase 1+)
 # Keep "legacy" until the affect path passes its own acceptance tests.
-mode = "legacy"
+mode = "affect"
 
 [ndi]
 # Empty = first source whose name contains "VTube" (case-insensitive).

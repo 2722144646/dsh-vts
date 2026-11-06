@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import time
 
-from .presets import anchor
+from .presets import anchor, canonical
 
 SOURCES = ("manual", "tool", "tag", "context", "classifier", "keyword", "ndi")
 
@@ -22,7 +22,7 @@ def normalize_labels(labels: dict[str, float] | None) -> dict[str, float]:
     """Clamp to 0..1, drop non-positive weights, and renormalize to sum 1."""
     clean: dict[str, float] = {}
     for raw_name, raw_weight in (labels or {}).items():
-        name = str(raw_name).strip().lower()
+        name = canonical(raw_name)
         if not name:
             continue
         try:
