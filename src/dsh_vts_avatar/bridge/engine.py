@@ -16,7 +16,7 @@ from ..audio.engine import Clock, make_clock
 from ..config import Config
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
-from ..performance.affect import AffectEvidence, AffectLog, AffectState
+from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
@@ -74,6 +74,9 @@ class AvatarEngine:
         # Phase 1/3: append-only record of every evidence record and the state
         # it produced, so a session can be replayed and audited later.
         self.affect_log = AffectLog(config.root / "data" / "affect")
+        # Phase 4: sources vote; nothing except a manual instruction outranks
+        # another source. See 用户原话与共识.md for the requirement.
+        self.fusion = AffectFusion()
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -533,7 +536,7 @@ class AvatarEngine:
             intensity=intensity,
             confidence=confidence,
         )
-        state = AffectState.from_evidence(evidence)
+        state = self.fusion.add(evidence)
         self.affect_log.evidence(evidence)
         self.affect_log.state(state, applied=True)
         self.mixer.set_affect(state)
@@ -561,17 +564,18 @@ class AvatarEngine:
             note=note,
             turn_id=turn_id,
         )
-        state = AffectState.from_evidence(evidence)
+        # Affect mode: this is one vote among several. Confidence decides how
+        # much it counts (see affect/fusion.py); nothing here forces a preset.
+        if self.config.emotion.is_affect:
+            state = self.fusion.add(evidence)
+        else:
+            state = AffectState.from_evidence(evidence)
         self.affect_log.evidence(evidence)
         if self.mixer is None:
             self.affect_log.state(state, applied=False)
             return {"ok": False, "error": "mixer not ready", "labels": state.labels}
 
         if self.config.emotion.is_affect:
-            # A low-confidence reading must not slam the face to full anchor.
-            # Scale the display strength instead of dropping the evidence, so
-            # Phase 4 fusion still sees what was said.
-            state.intensity = evidence.intensity * (0.5 + 0.5 * evidence.confidence)
             self.affect_log.state(state, applied=True)
             self.mixer.set_affect(state)
             dominant, weight = state.dominant()[0]

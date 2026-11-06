@@ -41,14 +41,16 @@ def test_feel_blends_weighted_labels_in_affect_mode(tmp_path):
     assert abs(engine.mixer.affect.labels["happy"] - 0.7) < 1e-9
 
 
-def test_low_confidence_softens_instead_of_hard_switching(tmp_path):
+def test_low_confidence_vote_fades_out_instead_of_hard_switching(tmp_path):
     engine = _engine("affect", tmp_path)
+    # confidence 0 means the vote has no weight: it must not move the face.
     weak = engine.feel({"sad": 1.0}, intensity=1.0, confidence=0.0)
-    confident = engine.feel({"sad": 1.0}, intensity=1.0, confidence=1.0)
+    assert weak["labels"] == {"neutral": 1.0}
+    assert weak["intensity"] == 0.0
 
-    assert weak["labels"] == confident["labels"]
-    assert weak["intensity"] <= 0.51
-    assert confident["intensity"] == 1.0
+    confident = engine.feel({"sad": 1.0}, intensity=1.0, confidence=1.0)
+    assert confident["labels"]["sad"] > 0.9
+    assert confident["intensity"] > 0.9
 
 
 def test_feel_degrades_to_dominant_preset_in_legacy_mode(tmp_path):
