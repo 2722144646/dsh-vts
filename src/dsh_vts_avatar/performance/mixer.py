@@ -18,6 +18,8 @@ from ..config import AvatarConfig
 from ..tts.timeline import Timeline, VisemeSegment
 from ..vts.profile import ModelProfile
 from .actions import ActionCue
+from .affect.composer import compose_face, compose_head
+from .affect.schema import AffectState
 from .emotion import EXPRESSION_HEAD, EXPRESSION_TARGETS, EmotionState
 
 
@@ -92,6 +94,11 @@ class PerformanceMixer:
     emotion: EmotionState = field(default_factory=EmotionState)
     state: str = "idle"
     actions: list[ActionCue] = field(default_factory=list)
+    # Phase 2: when enabled, face/head targets come from the composer instead
+    # of the single-preset lookup. Legacy stays the default until the affect
+    # path passes its own acceptance run.
+    affect: AffectState | None = None
+    use_affect: bool = False
 
     def __post_init__(self) -> None:
         self.backend = self.backend or "continuous"
@@ -158,6 +165,10 @@ class PerformanceMixer:
         if alias and self.profile is not None and alias in self.profile.expression_map:
             name = alias
         self.emotion.set(name, intensity)
+
+    def set_affect(self, state: AffectState | None) -> None:
+        """Attach the continuous affect state used by the composer path."""
+        self.affect = state
 
     def add_action(
         self,
@@ -553,6 +564,10 @@ class PerformanceMixer:
     # -- emotion ----------------------------------------------------------
 
     def _emotion_targets(self) -> dict[str, float]:
+        if self.use_affect and self.affect is not None:
+            # Phase 2: multi-label blend; the neutral base and the intensity
+            # ramp live in the composer, not here.
+            return compose_face(self.affect, self._gain("expression_gain", 1.0))
         if self.emotion.preset == "neutral" or self.emotion.preset_intensity < 0.08:
             # The model maps MouthSmile through MouthForm -1..1 and Brows
             # through -1..1 with an input floor of 0.15. Sending 0 made the
@@ -627,15 +642,21 @@ class PerformanceMixer:
         x += self._state_bias["x"] * self._speech_blend
         y += self._state_bias["y"] * self._speech_blend
         z += self._state_bias["z"] * self._speech_blend
-        expression_head = EXPRESSION_HEAD.get(self.emotion.preset, {})
-        strength = clamp(
-            self.emotion.preset_intensity * self._gain("expression_head_gain", 1.0),
-            0.0,
-            1.0,
-        )
-        x += expression_head.get("yaw", 0.0) * strength
-        y += expression_head.get("pitch", 0.0) * strength
-        z += expression_head.get("roll", 0.0) * strength
+        if self.use_affect and self.affect is not None:
+            composed = compose_head(self.affect, self._gain("expression_head_gain", 1.0))
+            x += composed["yaw"]
+            y += composed["pitch"]
+            z += composed["roll"]
+        else:
+            expression_head = EXPRESSION_HEAD.get(self.emotion.preset, {})
+            strength = clamp(
+                self.emotion.preset_intensity * self._gain("expression_head_gain", 1.0),
+                0.0,
+                1.0,
+            )
+            x += expression_head.get("yaw", 0.0) * strength
+            y += expression_head.get("pitch", 0.0) * strength
+            z += expression_head.get("roll", 0.0) * strength
         return {"x": x * gain, "y": y * gain, "z": z * gain}
 
     def _update_state_bias(self, dt: float) -> None:
