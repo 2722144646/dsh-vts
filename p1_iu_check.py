@@ -57,8 +57,8 @@ async def main() -> None:
         row = []
         for index in range(10):
             image = cv2.imread(str(OUT / f"{prefix}_{index:02d}.jpg"))
-            crop = image[760:1080, 620:1300]
-            crop = cv2.resize(crop, (680, 400))
+            crop = image[540:800, 680:1260]
+            crop = cv2.resize(crop, (580, 260))
             cv2.putText(crop, f"{prefix}{index}", (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
             row.append(crop)
         crops.append(np.hstack(row))

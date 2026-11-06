@@ -22,6 +22,9 @@ data/expression_shots/
 data/rvc_cache/
 data/demos/
 data/voice_training/
+data/audit/
+data/synergy/
+data/vb_audit/
 training/checkpoints/
 training/preprocessed/
 training/dataset/
