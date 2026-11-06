@@ -41,15 +41,19 @@ def _smooth(current: float, target: float, dt: float, attack: float, release: fl
 class GazeController:
     """Slow, bounded idle gaze. Expression gaze overrides it."""
 
-    def __init__(self, seed: int | None = None):
+    def __init__(self, seed: int | None = None, energy: float = 0.55):
         rng = random.Random(seed)
         self._phase = [rng.uniform(0, math.tau) for _ in range(4)]
         self._start = time.perf_counter()
+        # 有存在感 / 更活泼：more energy means a slightly wider and quicker
+        # gaze wander. Kept bounded so it never reads as a scanning loop.
+        self._amp = 0.75 + 0.60 * clamp(energy, 0.0, 1.0)
+        self._speed = 0.85 + 0.50 * clamp(energy, 0.0, 1.0)
 
     def update(self, now: float) -> tuple[float, float]:
-        t = max(0.0, now - self._start)
-        x = 0.20 * math.sin(t * 0.23 + self._phase[0]) + 0.06 * math.sin(t * 0.71 + self._phase[1])
-        y = 0.11 * math.sin(t * 0.19 + self._phase[2]) + 0.04 * math.sin(t * 0.53 + self._phase[3])
+        t = max(0.0, now - self._start) * self._speed
+        x = (0.20 * math.sin(t * 0.23 + self._phase[0]) + 0.06 * math.sin(t * 0.71 + self._phase[1])) * self._amp
+        y = (0.11 * math.sin(t * 0.19 + self._phase[2]) + 0.04 * math.sin(t * 0.53 + self._phase[3])) * self._amp
         return clamp(x, -0.45, 0.45), clamp(y, -0.30, 0.30)
 
 
@@ -105,8 +109,9 @@ class PerformanceMixer:
         self._last_time = time.perf_counter()
         self._started = self._last_time
         self._last_sample = 0
-        self._blink = BlinkController(self.avatar.blink_per_min)
-        self._gaze = GazeController()
+        self._blink = BlinkController(self.avatar.blink_per_min + 2.0 * clamp(getattr(self.avatar, "idle_energy", 0.55), 0.0, 1.0))
+        self._idle_energy = clamp(getattr(self.avatar, "idle_energy", 0.55), 0.0, 1.0)
+        self._gaze = GazeController(energy=self._idle_energy)
         self._values: dict[str, float] = {}
         self._vel: dict[str, float] = {}
         self._state_bias = {"x": 0.0, "y": 0.0, "z": 0.0}
@@ -641,15 +646,18 @@ class PerformanceMixer:
     def _head_targets(self, now: float) -> dict[str, float]:
         t = now - self._started
         gain = clamp(self._gain("head_gain", self.avatar.head_gain), 0.5, 3.5)
+        # Idle liveliness: 有存在感 / 更活泼 一半一半 -> a bit more sway, still
+        # bounded. It scales the idle component only, not emotion or speech.
+        sway = 0.80 + 0.70 * self._idle_energy
         x = (
             1.80 * math.sin(2 * math.pi * 0.071 * t)
             + 0.60 * math.sin(2 * math.pi * 0.193 * t + 1.3)
-        )
-        y = 1.05 * math.sin(2 * math.pi * 0.113 * t + 0.7)
+        ) * sway
+        y = 1.05 * math.sin(2 * math.pi * 0.113 * t + 0.7) * sway
         z = (
             2.00 * math.sin(2 * math.pi * 0.053 * t + 2.0)
             + 0.50 * math.sin(2 * math.pi * 0.227 * t + 0.4)
-        )
+        ) * sway
         v = self.emotion.valence
         a = self.emotion.arousal
         # A small emotional bias; never a big pose change.
