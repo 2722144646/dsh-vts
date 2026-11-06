@@ -1,0 +1,2 @@
+{"t":1793969462.1252549,"kind":"evidence","source":"tool","labels":{"happy":0.6,"tired":0.4},"intensity":0.8,"confidence":0.9,"note":"Phase 3 end-to-end check","turn_id":"","timestamp":1793969462.125175}
+{"t":1793969462.1291332,"kind":"state","labels":{"happy":0.6,"tired":0.4},"intensity":0.76,"confidence":0.9,"valence":0.32999999999999996,"arousal":0.37,"hold_until":0.0,"source":"evidence","updated_at":1793969462.125239,"applied":true}

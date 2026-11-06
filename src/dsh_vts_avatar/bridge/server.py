@@ -134,6 +134,21 @@ class BridgeServer:
                 str(msg.get("name") or "neutral"),
                 float(msg.get("intensity", 0.7)),
             )
+        elif mtype == "feel":
+            # Phase 3: weighted labels + confidence + note. The bridge answers
+            # with the derived state so the tool can report what it applied.
+            result = self.engine.feel(
+                labels=msg.get("labels") if isinstance(msg.get("labels"), dict) else {},
+                intensity=float(msg.get("intensity", 0.7)),
+                confidence=float(msg.get("confidence", 0.8)),
+                note=str(msg.get("note") or ""),
+                turn_id=str(msg.get("turn_id") or ""),
+            )
+            await ws.send(
+                orjson.dumps(
+                    {"type": "feel.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "record":
             summary = await self.engine.record_expression(
                 str(msg.get("name") or "learned"),
