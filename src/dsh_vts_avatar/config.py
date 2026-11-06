@@ -126,6 +126,24 @@ class RVCConfig:
 
 
 @dataclass(slots=True)
+class EmotionConfig:
+    """Emotion pipeline selector.
+
+    ``legacy`` keeps presets + priority + keyword fallback (v0.5.0 behavior).
+    ``affect`` switches to the multi-source evidence pipeline. Phase 0 only
+    adds the switch; the affect path arrives in later phases.
+    """
+
+    mode: str = "legacy"
+
+    VALID_MODES = ("legacy", "affect")
+
+    @property
+    def is_affect(self) -> bool:
+        return self.mode == "affect"
+
+
+@dataclass(slots=True)
 class Config:
     root: Path
     vts: VTSConfig = field(default_factory=VTSConfig)
@@ -135,6 +153,7 @@ class Config:
     rvc: RVCConfig = field(default_factory=RVCConfig)
     ndi: NDIConfig = field(default_factory=NDIConfig)
     bridge: BridgeConfig = field(default_factory=BridgeConfig)
+    emotion: EmotionConfig = field(default_factory=EmotionConfig)
 
     def resolve(self, path: Path | None) -> Path | None:
         if path is None:
@@ -188,6 +207,7 @@ def load_config(path: str | Path | None = None) -> Config:
     ndi_raw = _section(raw, "ndi")
     bridge_raw = _section(raw, "bridge")
     rvc_raw = _section(raw, "rvc")
+    emotion_raw = _section(raw, "emotion")
 
     cfg = Config(root=root)
     cfg.vts = VTSConfig(
@@ -282,6 +302,10 @@ def load_config(path: str | Path | None = None) -> Config:
         host=str(bridge_raw.get("host", "127.0.0.1")),
         port=int(bridge_raw.get("port", 8765)),
     )
+    mode = str(emotion_raw.get("mode", "legacy")).strip().lower()
+    if mode not in EmotionConfig.VALID_MODES:
+        mode = "legacy"
+    cfg.emotion = EmotionConfig(mode=mode)
     # Resolve every filesystem path once, against the config directory. This
     # keeps the bridge independent of the process current working directory.
     cfg.vts.token_path = cfg.resolve(cfg.vts.token_path)  # type: ignore[assignment]

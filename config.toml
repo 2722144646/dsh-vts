@@ -102,6 +102,12 @@ voice_u = "VoiceU"
 voice_e = "VoiceE"
 voice_o = "VoiceO"
 
+[emotion]
+# legacy = presets + priority + keyword fallback (v0.5.0 behavior, default)
+# affect = multi-source evidence fusion (emotion refactor Phase 1+)
+# Keep "legacy" until the affect path passes its own acceptance tests.
+mode = "legacy"
+
 [ndi]
 # Empty = first source whose name contains "VTube" (case-insensitive).
 source = ""
