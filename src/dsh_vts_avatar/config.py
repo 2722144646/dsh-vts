@@ -65,6 +65,12 @@ class AvatarConfig:
     head_spring_zeta: float = 1.0
     mouth_gain: float = 1.0
     gesture_rate: float = 0.4
+    # Idle liveliness: 0 = quiet, 1 = lively. User answer 2026-11-06:
+    # 有存在感 / 更活泼 一半一半.
+    idle_energy: float = 0.55
+    # Expression strength: natural 70% / exaggerated 30% (user answer).
+    exaggeration_share: float = 0.30
+    exaggeration_gain: float = 1.30
     blink_per_min: float = 14.0
     mouth_backend: str = "auto"
     mouth_open: str = "MouthOpen"
@@ -254,6 +260,9 @@ def load_config(path: str | Path | None = None) -> Config:
         head_spring_zeta=float(avatar_raw.get("head_spring_zeta", 1.0)),
         mouth_gain=float(avatar_raw.get("mouth_gain", 1.0)),
         gesture_rate=float(avatar_raw.get("gesture_rate", 0.4)),
+        idle_energy=float(avatar_raw.get("idle_energy", 0.55)),
+        exaggeration_share=float(avatar_raw.get("exaggeration_share", 0.30)),
+        exaggeration_gain=float(avatar_raw.get("exaggeration_gain", 1.30)),
         blink_per_min=float(avatar_raw.get("blink_per_min", 14.0)),
         mouth_backend=str(avatar_raw.get("mouth_backend", "auto")),
         mouth_open=str(avatar_raw.get("mouth_open", "MouthOpen")),

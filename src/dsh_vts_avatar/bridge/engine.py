@@ -71,6 +71,7 @@ class AvatarEngine:
         self._speech_generation = 0
         self.mouth_monitor = MouthMonitor()
         self.rvc = RVCConverter(config.rvc)
+        self._rng = random.Random()
         # Phase 1/3: append-only record of every evidence record and the state
         # it produced, so a session can be replayed and audited later.
         self.affect_log = AffectLog(config.root / "data" / "affect")
@@ -510,6 +511,13 @@ class AvatarEngine:
             if gesture and not any(cue.kind == gesture and not cue.finished for cue in self.mixer.actions):
                 self.mixer.add_action(gesture, intensity)
 
+    def _sample_expression_gain(self) -> float:
+        """Natural 70% / exaggerated 30% (user answer 2026-11-06)."""
+        share = max(0.0, min(1.0, self.config.avatar.exaggeration_share))
+        if self._rng.random() < share:
+            return max(1.0, self.config.avatar.exaggeration_gain)
+        return 1.0
+
     def _push_affect(
         self,
         label: str,
@@ -537,6 +545,7 @@ class AvatarEngine:
             confidence=confidence,
         )
         state = self.fusion.add(evidence)
+        state.intensity = min(1.0, state.intensity * self._sample_expression_gain())
         self.affect_log.evidence(evidence)
         self.affect_log.state(state, applied=True)
         self.mixer.set_affect(state)
@@ -568,6 +577,7 @@ class AvatarEngine:
         # much it counts (see affect/fusion.py); nothing here forces a preset.
         if self.config.emotion.is_affect:
             state = self.fusion.add(evidence)
+            state.intensity = min(1.0, state.intensity * self._sample_expression_gain())
         else:
             state = AffectState.from_evidence(evidence)
         self.affect_log.evidence(evidence)

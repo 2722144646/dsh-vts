@@ -73,6 +73,12 @@ head_spring_hz = 1.9
 head_spring_zeta = 1.0
 mouth_gain = 1.0
 gesture_rate = 0.4
+# Idle liveliness: 0 = quiet, 1 = lively.
+# User answer 2026-11-06: 有存在感 / 更活泼 一半一半.
+idle_energy = 0.55
+# Expression strength mix: natural 70% / exaggerated 30% (user answer).
+exaggeration_share = 0.30
+exaggeration_gain = 1.30
 blink_per_min = 14.0
 # auto | vowel | continuous | hybrid
 mouth_backend = "auto"
