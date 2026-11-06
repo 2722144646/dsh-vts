@@ -112,6 +112,7 @@ class PerformanceMixer:
         self._state_bias = {"x": 0.0, "y": 0.0, "z": 0.0}
         self._speech_blend = 0.0
         self._speech_target = 0.0
+        self._affect_stamp = 0.0
         self._last_turn_sample = -10**9
         self._mouth_backend = self._decide_backend()
 
@@ -169,6 +170,20 @@ class PerformanceMixer:
     def set_affect(self, state: AffectState | None) -> None:
         """Attach the continuous affect state used by the composer path."""
         self.affect = state
+        self._affect_stamp = time.time()
+
+    #: How long a described feeling holds before it starts fading, and the
+    #: release time constant. Evidence only arrives when someone speaks, so
+    #: without a decay the last `feel()` would smile forever.
+    AFFECT_HOLD_S = 2.0
+    AFFECT_RELEASE_S = 2.2
+
+    def _update_affect(self, dt: float) -> None:
+        if not self.use_affect or self.affect is None:
+            return
+        if time.time() - self._affect_stamp <= self.AFFECT_HOLD_S:
+            return
+        self.affect.intensity *= math.exp(-max(0.0, dt) / self.AFFECT_RELEASE_S)
 
     def add_action(
         self,
@@ -219,6 +234,7 @@ class PerformanceMixer:
         dt = clamp(now - self._last_time, 0.001, 0.15)
         self._last_time = now
         self.emotion.update(dt)
+        self._update_affect(dt)
         self._update_state_bias(dt)
         self._speech_blend = _smooth(
             self._speech_blend, self._speech_target, dt, 0.22, 0.45
