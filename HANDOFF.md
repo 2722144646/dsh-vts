@@ -1,9 +1,14 @@
 # dsh × VTube Studio 交接摘要
 
+> ⚠️ **历史文件（2026-11-04）。** 仓库已于 2026-11-06 迁到 `E:\dsh-vts-avatar\project`，
+> 当前状态、运行命令和已知缺口以 `E:\dsh-vts-avatar\START_HERE.md` 为准。
+> 本文件里的测试数（29）、双唇时序（8ms/15ms，后来已改回 10ms/20ms）、设备结论都已过时，
+> 只保留语音训练和早期调参的历史记录供追溯。
+
 生成时间：2026-11-04  
-仓库：`C:\Users\27221\Documents\deepseek-harness\default-workspace\dsh-vts-avatar`  
+仓库：`E:\dsh-vts-avatar\project`（原 `C:\Users\27221\Documents\deepseek-harness\default-workspace\dsh-vts-avatar`，已迁出）  
 当前提交：本文件所在提交（HEAD，尚未推送）；代码功能基线为已推送的 `1008f33`  
-测试：29 个通过
+测试：29 个通过（当时）
 
 ## 1. 当前运行状态
 
@@ -147,8 +152,8 @@
 ## 7. 运行命令
 
 ```powershell
-cd C:\Users\27221\Documents\deepseek-harness\default-workspace
-.\.venv\Scripts\python.exe -m dsh_vts_avatar --config dsh-vts-avatar/config.toml serve
+cd E:\dsh-vts-avatar\project
+.\.venv\Scripts\python.exe -m dsh_vts_avatar --config config.toml serve
 ```
 
 VTS 必须先启动，API 端口为 8002。
