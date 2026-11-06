@@ -9,7 +9,7 @@ PRESETS = ["happy", "sad", "angry", "surprised", "thinking", "shy", "wronged"]
 ROOT = Path(__file__).resolve().parent / "data"
 LEGACY = ROOT / "expression_shots_legacy"
 AFFECT = ROOT / "expression_shots_affect"
-OUT = ROOT / "expression_shots" / "affect_vs_legacy.jpg"
+OUT = ROOT / "expression_shots_affect" / "affect_vs_legacy.jpg"
 
 CROP = (slice(40, 760), slice(500, 1300))
 TILE = (200, 180)
