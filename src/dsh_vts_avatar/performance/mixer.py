@@ -278,7 +278,7 @@ class PerformanceMixer:
             -1.0,
             1.0,
         )
-        mouth_open = max(speech["open"], emotional["open"])
+        mouth_open = max(speech["open"], emotional["open"], actions.get("open", 0.0))
         if self.state == "thinking":
             mouth_open *= 0.25
         voice = speech["voice"]
