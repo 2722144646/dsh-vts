@@ -8,6 +8,7 @@ import math
 import random
 import time
 from pathlib import Path
+from dataclasses import replace
 from typing import Any, Awaitable, Callable
 
 import numpy as np
@@ -415,10 +416,11 @@ class AvatarEngine:
         if not text:
             return
         if self.mixer is not None:
-            # Keywords can be split across deltas ("开" + "心"); evaluate a
-            # short rolling window instead of each fragment in isolation.
+            # Keywords can be split across deltas; evaluate a rolling window.
+            # 2026-11-07: keyword triggering is OFF — the only affect sources are
+            # the tool self-report and explicit [emotion:...] tags.
             self._affect_buffer = (self._affect_buffer + text)[-32:]
-            affect = emotion_from_text(self._affect_buffer)
+            affect = None
             if affect:
                 self.mixer.set_emotion(*affect)
                 if self.config.emotion.is_affect:
@@ -636,6 +638,7 @@ class AvatarEngine:
         cause: str = "",
         why: str = "",
         appraisal: list[str] | None = None,
+        display: float | None = None,
     ) -> dict[str, Any]:
         """Describe the current emotional state (Phase 3).
 
@@ -670,7 +673,14 @@ class AvatarEngine:
 
         if self.config.emotion.is_affect:
             self.affect_log.state(state, applied=True)
-            self.mixer.set_affect(state)
+            applied = state
+            if display is not None:
+                # felt stays in the log; displayed drives the face (2026-11-07)
+                applied = replace(
+                    state,
+                    intensity=max(0.0, min(1.0, state.intensity * max(0.0, min(1.0, float(display))))),
+                )
+            self.mixer.set_affect(applied)
             dominant, weight = state.dominant()[0]
             if weight >= 0.5:
                 # Keep the learned-expression/profile path alive; the face

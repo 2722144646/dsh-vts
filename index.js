@@ -457,6 +457,14 @@ export function apply(ctx, config = {}) {
               items: { type: 'string' },
               description: 'Optional appraisal words, e.g. ["被否定","委屈"].',
             },
+            display: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              description:
+                'How much of the feeling to show: 0 hides it, 1 shows it fully. The felt state is still '
+                + 'logged; this only changes the face. Omit for full display.',
+            },
           },
           required: ['labels'],
           additionalProperties: false,
@@ -490,6 +498,7 @@ export function apply(ctx, config = {}) {
               cause: String(args?.cause ?? ''),
               why: String(args?.why ?? ''),
               appraisal: Array.isArray(args?.appraisal) ? args.appraisal.map(String) : [],
+              display: args?.display === undefined ? undefined : Number(args.display),
             });
             if (result?.mood_text) client.setMood(result.mood_text);
             return { ...result, ok: result?.ok !== false };
