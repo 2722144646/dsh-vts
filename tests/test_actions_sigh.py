@@ -10,6 +10,6 @@ def test_sigh_opens_the_mouth_and_sinks_the_head():
 
 def test_sigh_is_short_and_settles():
     cue = ActionCue.create("sigh", start=0, sample_rate=1000)
-    assert cue.duration == 1200
-    assert cue.sample(1199) != {}
-    assert cue.sample(1200) == {}
+    assert cue.duration == 1800
+    assert cue.sample(1799) != {}
+    assert cue.sample(1800) == {}
