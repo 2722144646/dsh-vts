@@ -12,8 +12,9 @@ continuous state. Conflicting votes are allowed to coexist as a mixed state —
 
 The AI's own self-report (``tool``) carries the highest weight by design: it is
 the only source that has actually read the conversation. A manual user
-instruction is not an emotion source — it is an explicit command, and it still
-hard-overrides for its short window.
+instruction is just another vote at half weight (``manual`` 0.5) — the user's
+requirement is freedom, so no source may forcibly override another, not even an
+explicit command.
 
 Nothing here writes to VTS.
 """
@@ -27,13 +28,14 @@ from .schema import AffectEvidence, AffectState, derive_valence_arousal, normali
 
 #: Base reliability per source. NDI is a correction channel, not an opinion.
 #: ``tool`` (the AI's own self-report) is deliberately the highest: it is the
-#: only vote backed by the actual conversation. ``manual`` is not here — it is a
-#: user command handled by the override path, not a weighted vote.
+#: only vote backed by the actual conversation. ``manual`` is a user command,
+#: but it is still only a mid-weight vote — nothing hard-overrides.
 SOURCE_WEIGHTS: dict[str, float] = {
     "tool": 1.0,
     "tag": 0.85,
     "context": 0.75,
     "classifier": 0.7,
+    "manual": 0.5,
     "keyword": 0.45,
     "ndi": 0.0,
 }
@@ -46,8 +48,6 @@ class FusionSettings:
     source_weights: dict[str, float] = field(default_factory=lambda: dict(SOURCE_WEIGHTS))
     #: Evidence older than this stops voting (mixer decay starts earlier).
     evidence_ttl_s: float = 10.0
-    #: A manual instruction overrides other sources for this long, then expires.
-    manual_ttl_s: float = 6.0
     #: Optional stability guard: below this label distance, keep the previous
     #: labels instead of flip-flopping between two near-identical readings.
     switch_threshold: float = 0.15
@@ -85,22 +85,6 @@ class AffectFusion:
         self._prune(now)
         if not self._evidence:
             return AffectState.neutral()
-
-        manual = self._fresh_manual(now)
-        if manual is not None:
-            # The one allowed hard override: the user said so.
-            labels = normalize_labels(manual.labels)
-            valence, arousal = derive_valence_arousal(labels)
-            state = AffectState(
-                labels=labels,
-                intensity=manual.intensity,
-                confidence=manual.confidence,
-                valence=valence,
-                arousal=arousal,
-                source="manual",
-            )
-            self._last = state
-            return state
 
         blended: dict[str, float] = {}
         total_weight = 0.0
@@ -140,14 +124,6 @@ class AffectFusion:
     def _prune(self, now: float) -> None:
         ttl = self.settings.evidence_ttl_s
         self._evidence = [e for e in self._evidence if now - e.timestamp <= ttl]
-
-    def _fresh_manual(self, now: float) -> AffectEvidence | None:
-        manual = [
-            e
-            for e in self._evidence
-            if e.source == "manual" and now - e.timestamp <= self.settings.manual_ttl_s
-        ]
-        return manual[-1] if manual else None
 
     def _vote_weight(self, evidence: AffectEvidence, now: float) -> float:
         reliability = self.settings.source_weights.get(evidence.source, DEFAULT_SOURCE_WEIGHT)

@@ -496,8 +496,8 @@ class AvatarEngine:
         if self.mixer is not None:
             self.mixer.set_emotion(name, intensity)
             if self.config.emotion.is_affect:
-                # A manual instruction is the one source allowed to hard
-                # override; keep it at full confidence.
+                # A manual instruction is a mid-weight vote (0.5), not a hard
+                # override: freedom means no source can force the face.
                 self._push_affect(name, intensity, source="manual", confidence=1.0)
             # Thinking/shy have no fixed standard take yet, but they must
             # still be triggerable. Improvise them from the generic preset
