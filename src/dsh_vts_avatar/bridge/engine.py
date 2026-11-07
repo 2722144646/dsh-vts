@@ -417,8 +417,9 @@ class AvatarEngine:
             return
         if self.mixer is not None:
             # Keywords can be split across deltas; evaluate a rolling window.
-            # 2026-11-07: keyword triggering is OFF — the only affect sources are
-            # the tool self-report and explicit [emotion:...] tags.
+            # 2026-11-07: only the tool self-report drives affect now. Explicit
+            # [emotion:...] tags are still stripped from speech, but no longer
+            # create affect evidence; keyword matching is off entirely.
             self._affect_buffer = (self._affect_buffer + text)[-32:]
             affect = None
             if affect:
