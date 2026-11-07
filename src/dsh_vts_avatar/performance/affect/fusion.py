@@ -8,8 +8,12 @@ The point of this module is the user's core requirement:
 So every source is a *vote*, not a command. Votes are weighted by source
 reliability, the source's own confidence, and freshness; the result is one
 continuous state. Conflicting votes are allowed to coexist as a mixed state —
-"don't know yet" is a legal answer. The only exception is a manual user
-instruction, which the plan explicitly allows to hard-override.
+"don't know yet" is a legal answer.
+
+The AI's own self-report (``tool``) carries the highest weight by design: it is
+the only source that has actually read the conversation. A manual user
+instruction is not an emotion source — it is an explicit command, and it still
+hard-overrides for its short window.
 
 Nothing here writes to VTS.
 """
@@ -22,9 +26,11 @@ import time
 from .schema import AffectEvidence, AffectState, derive_valence_arousal, normalize_labels
 
 #: Base reliability per source. NDI is a correction channel, not an opinion.
+#: ``tool`` (the AI's own self-report) is deliberately the highest: it is the
+#: only vote backed by the actual conversation. ``manual`` is not here — it is a
+#: user command handled by the override path, not a weighted vote.
 SOURCE_WEIGHTS: dict[str, float] = {
-    "manual": 1.0,
-    "tool": 0.9,
+    "tool": 1.0,
     "tag": 0.85,
     "context": 0.75,
     "classifier": 0.7,
