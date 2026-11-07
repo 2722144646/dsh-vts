@@ -4020,3 +4020,13 @@
 {"t":1794063936.3886333,"kind":"state","labels":{"doubtful":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.1,"arousal":0.35,"hold_until":0.0,"source":"fusion","updated_at":1794063936.386071,"applied":true}
 {"t":1794063948.273717,"kind":"evidence","source":"tool","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063948.273661}
 {"t":1794063948.2750552,"kind":"state","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.35,"arousal":0.3,"hold_until":0.0,"source":"fusion","updated_at":1794063948.2737083,"applied":true}
+{"t":1794064204.696801,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794064204.696736}
+{"t":1794064204.6987455,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794064204.6967874,"applied":true}
+{"t":1794064250.4646626,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794064250.464587}
+{"t":1794064250.465799,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794064250.4646516,"applied":true}
+{"t":1794064322.85299,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794064322.852863}
+{"t":1794064322.8548703,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794064322.852964,"applied":true}
+{"t":1794064695.4184582,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794064695.4183803}
+{"t":1794064695.4206169,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794064695.4184396,"applied":true}
+{"t":1794064879.7328205,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794064879.7327335}
+{"t":1794064879.7352629,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794064879.732801,"applied":true}
