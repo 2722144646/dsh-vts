@@ -887,6 +887,12 @@ class AvatarEngine:
             "mood_text": self.mood_payload()["text"],
         }
 
+    async def hotkey_list(self) -> dict[str, Any]:
+        return await self.vts.list_hotkeys()
+
+    async def hotkey_trigger(self, hotkey_id: str) -> dict[str, Any]:
+        return await self.vts.trigger_hotkey(hotkey_id)
+
     async def record_expression(self, name: str, seconds: float = 4.0) -> dict[str, Any]:
         """Read-only capture of a user-performed expression.
 

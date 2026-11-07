@@ -26,7 +26,7 @@ from .schema import AffectState
 # The model's neutral input values. Sending 0 makes this avatar frown and
 # collapse the brows, so 0 is wrong even when "no emotion" is intended.
 NEUTRAL_FACE: dict[str, float] = {
-    "smile": 0.50,
+    "smile": 0.0,  # 2026-11-07 用户要求：静止时不要平笑
     "eye": 0.55,
     "brow": 0.575,
     "angry": 0.0,
