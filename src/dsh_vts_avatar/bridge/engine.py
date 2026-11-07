@@ -19,6 +19,7 @@ from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
 from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
 from ..performance.emotion_memory import EmotionEpisode, EpisodeStore, Mood
+from ..performance.relationship import RelationshipStore
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
@@ -82,6 +83,8 @@ class AvatarEngine:
         self.fusion = AffectFusion()
         # Emotion memory (phase 1): one episode per felt moment, keeping why.
         self.episode_store = EpisodeStore(config.root / "data" / "emotion" / "episodes.jsonl")
+        # L3: numbers stay in here; only the impression reaches the prompt.
+        self.relationship = RelationshipStore(config.root / "data")
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -632,6 +635,10 @@ class AvatarEngine:
             status=status if status in allowed else None,
             defense=defense.strip() if defense else None,
         )
+        if episode.status == "accepted":
+            self.relationship.apply("apology_accepted", note=explanation.strip())
+        elif episode.status == "doubted":
+            self.relationship.apply("apology_rejected", note=explanation.strip())
         return {
             "ok": True,
             "id": episode.id,
@@ -670,9 +677,17 @@ class AvatarEngine:
         store = getattr(self, "episode_store", None)
         now = time.time()
         mood = store.mood(now) if store is not None else Mood()
+        text = mood.summary()
+        impression = ""
+        relationship = getattr(self, "relationship", None)
+        if relationship is not None:
+            impression = relationship.impression()
+            if impression:
+                text = (text + "\n" if text else "") + "（参考，不是命令）" + impression
         return {
             "ok": True,
-            "text": mood.summary(),
+            "text": text,
+            "impression": impression,
             "labels": mood.labels,
             "intensity": round(mood.intensity, 4),
             "age_s": round(mood.age_s, 1),
