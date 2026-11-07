@@ -4046,3 +4046,7 @@
 {"t":1794066142.4197862,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794066142.4188368,"applied":true}
 {"t":1794066224.825202,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794066224.8250892}
 {"t":1794066224.8270178,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794066224.8251553,"applied":true}
+{"t":1794066295.672392,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794066295.6723292}
+{"t":1794066295.6736221,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794066295.6723783,"applied":true}
+{"t":1794066356.4902132,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794066356.4901388}
+{"t":1794066356.4923484,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794066356.4901962,"applied":true}

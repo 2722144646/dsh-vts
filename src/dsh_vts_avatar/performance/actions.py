@@ -157,8 +157,8 @@ class ActionCue:
             return {"gaze_x": 0.52 * eyes * amp, "gaze_y": 0.12 * eyes * amp}
         if self.kind == "sigh":
             # 哈气：张嘴呼气 + 低头 -> 慢慢回正。笑不归这里管。
-            breathe = _hold(t, 0.08, 0.42)
-            sink = _hold(t, 0.12, 0.46)
+            breathe = _hold(t, 0.08, 0.55)
+            sink = _hold(t, 0.12, 0.60)
             return {
                 "open": 0.40 * breathe * amp,
                 "pitch": 5.5 * sink * amp,
