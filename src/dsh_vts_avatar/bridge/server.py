@@ -146,6 +146,7 @@ class BridgeServer:
                 cause=str(msg.get("cause") or ""),
                 why=str(msg.get("why") or ""),
                 appraisal=msg.get("appraisal") if isinstance(msg.get("appraisal"), list) else None,
+                display=float(msg["display"]) if msg.get("display") is not None else None,
             )
             await ws.send(
                 orjson.dumps(
