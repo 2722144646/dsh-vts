@@ -104,6 +104,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message.summary ?? null);
         }
+      } else if (message.type === 'explain.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'feel.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -499,6 +506,75 @@ export function apply(ctx, config = {}) {
               why: String(args?.why ?? ''),
               appraisal: Array.isArray(args?.appraisal) ? args.appraisal.map(String) : [],
               display: args?.display === undefined ? undefined : Number(args.display),
+            });
+            if (result?.mood_text) client.setMood(result.mood_text);
+            return { ...result, ok: result?.ok !== false };
+          } catch (error) {
+            return { ok: false, error: String(error?.message ?? error) };
+          }
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_explain',
+        description:
+          'Record how an explanation landed on the latest emotional episode. You judge the acceptance — ' +
+          'the bridge only stores your verdict. status: accepted (真信了), doubted (听了但不太信), ' +
+          'suppressed (压着不处理), open (still unresolved). This updates memory; the face follows mood separately.',
+        parameters: {
+          type: 'object',
+          properties: {
+            explanation: {
+              type: 'string',
+              description: 'What was said, in one short sentence.',
+            },
+            acceptance: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              description: 'How much you believe it (0-1). Optional; omit when you are not sure.',
+            },
+            status: {
+              type: 'string',
+              enum: ['open', 'doubted', 'suppressed', 'accepted'],
+              description: 'What the explanation did to the feeling.',
+            },
+            defense: {
+              type: 'string',
+              enum: ['rationalize', 'denial', 'self_blame'],
+              description: 'Optional: the defense you used, so it stays visible in the log.',
+            },
+            episode_id: {
+              type: 'string',
+              description: 'Optional episode id; defaults to the latest open one.',
+            },
+          },
+          required: ['status'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => {
+            if (value?.ok === false) {
+              return [{ type: 'text', text: `Explain failed: ${value?.error ?? 'unknown error'}` }];
+            }
+            return [
+              {
+                type: 'text',
+                text: `Episode ${value?.id ?? '?'} -> ${value?.status ?? '?'}` +
+                  ` (acceptance ${value?.acceptance ?? '?'})`,
+              },
+            ];
+          },
+        },
+        async execute(args) {
+          try {
+            const result = await client.request('explain', {
+              explanation: String(args?.explanation ?? ''),
+              acceptance: args?.acceptance === undefined ? undefined : Number(args.acceptance),
+              status: String(args?.status ?? 'open'),
+              defense: args?.defense ? String(args.defense) : undefined,
+              episode_id: String(args?.episode_id ?? ''),
             });
             if (result?.mood_text) client.setMood(result.mood_text);
             return { ...result, ok: result?.ok !== false };

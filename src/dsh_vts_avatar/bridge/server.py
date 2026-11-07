@@ -164,6 +164,20 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "explain":
+            # Phase 2: how an explanation landed (model judges acceptance).
+            result = self.engine.explain(
+                explanation=str(msg.get("explanation") or ""),
+                acceptance=float(msg["acceptance"]) if msg.get("acceptance") is not None else None,
+                status=str(msg.get("status") or ""),
+                defense=str(msg.get("defense") or "") or None,
+                episode_id=str(msg.get("episode_id") or ""),
+            )
+            await ws.send(
+                orjson.dumps(
+                    {"type": "explain.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "record":
             summary = await self.engine.record_expression(
                 str(msg.get("name") or "learned"),

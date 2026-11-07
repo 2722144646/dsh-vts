@@ -605,6 +605,41 @@ class AvatarEngine:
             )
         )
 
+    def explain(
+        self,
+        explanation: str = "",
+        acceptance: float | None = None,
+        status: str = "",
+        defense: str | None = None,
+        episode_id: str = "",
+    ) -> dict[str, Any]:
+        """Record how an explanation landed on the latest open episode.
+
+        The model judges acceptance; the bridge only stores the verdict and
+        applies the status to salience (accepted fades faster, suppressed holds).
+        """
+        store = getattr(self, "episode_store", None)
+        if store is None:
+            return {"ok": False, "error": "emotion store not ready"}
+        episode = store.find(episode_id or None)
+        if episode is None:
+            return {"ok": False, "error": "no open episode to explain"}
+        allowed = ("open", "doubted", "suppressed", "accepted")
+        store.revise(
+            episode,
+            explanation=explanation.strip() or None,
+            acceptance=acceptance,
+            status=status if status in allowed else None,
+            defense=defense.strip() if defense else None,
+        )
+        return {
+            "ok": True,
+            "id": episode.id,
+            "status": episode.status,
+            "acceptance": round(episode.acceptance, 3),
+            "mood_text": self.mood_payload()["text"],
+        }
+
     def mood_payload(self, limit: int = 3) -> dict[str, Any]:
         """Current mood + what caused it, for the plugin's prompt context."""
         store = getattr(self, "episode_store", None)
