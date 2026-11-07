@@ -4006,3 +4006,11 @@
 {"t":1794063468.8716106,"kind":"state","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.35,"arousal":0.3,"hold_until":0.0,"source":"fusion","updated_at":1794063468.8705049,"applied":true}
 {"t":1794063469.4249504,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063469.424901}
 {"t":1794063469.4262824,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794063469.424938,"applied":true}
+{"t":1794063757.9210103,"kind":"evidence","source":"tool","labels":{"suppressed":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063757.920868}
+{"t":1794063757.9231796,"kind":"state","labels":{"suppressed":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.45,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794063757.920979,"applied":true}
+{"t":1794063770.215217,"kind":"evidence","source":"tool","labels":{"doubtful":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063770.2150862}
+{"t":1794063770.2170553,"kind":"state","labels":{"doubtful":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.1,"arousal":0.35,"hold_until":0.0,"source":"fusion","updated_at":1794063770.2151947,"applied":true}
+{"t":1794063782.3103688,"kind":"evidence","source":"tool","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063782.3103278}
+{"t":1794063782.311309,"kind":"state","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.35,"arousal":0.3,"hold_until":0.0,"source":"fusion","updated_at":1794063782.3103623,"applied":true}
+{"t":1794063793.8092413,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063793.8091853}
+{"t":1794063793.8102849,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794063793.8092306,"applied":true}

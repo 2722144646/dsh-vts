@@ -100,18 +100,18 @@ EXPRESSION_TARGETS: dict[str, dict[str, float]] = {
     "neutral": {"smile": 0.14, "eye": 0.93, "brow": 0.10, "angry": 0.0, "inner_brow": 0.04, "open": 0.02},
     "calm": {"smile": 0.20, "eye": 0.90, "brow": 0.08, "angry": 0.0, "inner_brow": 0.06, "open": 0.02},
     # --- nuanced L2 states (2026-11-07) ---------------------------------
-    # suppressed: 难过的“收着”版。嘴角压住不像哭，眼半垂，内眉微提。
-    "suppressed": {"smile": 0.18, "eye": 0.42, "brow": 0.18, "angry": 0.0, "inner_brow": 0.55,
-                   "open": 0.0, "gaze_x": 0.10, "gaze_y": -0.20, "brow_l": 0.18, "brow_r": 0.18},
-    # doubtful: 半信半疑。单边挑眉、眼睛微眯、头略偏。
-    "doubtful": {"smile": 0.32, "eye": 0.70, "brow": 0.50, "angry": 0.0, "inner_brow": 0.20,
-                 "open": 0.02, "gaze_x": 0.30, "gaze_y": 0.05, "brow_l": 0.55, "brow_r": 0.05},
-    # guilty: 心虚。眼往下、内眉上提、嘴角收紧。
-    "guilty": {"smile": 0.20, "eye": 0.45, "brow": 0.10, "angry": 0.0, "inner_brow": 0.65,
-               "open": 0.0, "gaze_x": 0.20, "gaze_y": -0.35, "brow_l": 0.20, "brow_r": 0.20},
-    # relieved: 松了口气。眉舒展、眼轻闭、嘴角微抬。
-    "relieved": {"smile": 0.62, "eye": 0.50, "brow": 0.25, "angry": 0.0, "inner_brow": 0.10,
-                 "open": 0.0, "gaze_x": 0.0, "gaze_y": 0.0},
+    # suppressed: 难过的“收着”版，但这次做明显一些：嘴角压平、眼半闭、内眉提、低头。
+    "suppressed": {"smile": 0.04, "eye": 0.28, "brow": 0.05, "angry": 0.0, "inner_brow": 0.90,
+                   "open": 0.0, "gaze_x": 0.12, "gaze_y": -0.40, "brow_l": 0.10, "brow_r": 0.10},
+    # doubtful: 半信半疑，夸张版：一边眉挑很高、一边压平，眼眯、头偏、视线斜。
+    "doubtful": {"smile": 0.22, "eye": 0.58, "brow": 0.75, "angry": 0.0, "inner_brow": 0.35,
+                 "open": 0.02, "gaze_x": 0.50, "gaze_y": 0.10, "brow_l": 0.90, "brow_r": 0.0},
+    # guilty: 心虚，夸张版：低头躲视线、内眉高提、嘴角收紧。
+    "guilty": {"smile": 0.08, "eye": 0.30, "brow": 0.05, "angry": 0.0, "inner_brow": 0.95,
+               "open": 0.0, "gaze_x": 0.35, "gaze_y": -0.55, "brow_l": 0.10, "brow_r": 0.10},
+    # relieved: 松了口气，夸张版：嘴角明显上扬、眼轻闭、眉舒展、微抬头。
+    "relieved": {"smile": 0.80, "eye": 0.40, "brow": 0.15, "angry": 0.0, "inner_brow": 0.05,
+                 "open": 0.10, "gaze_x": 0.0, "gaze_y": 0.10},
 }
 
 EXPRESSION_HEAD: dict[str, dict[str, float]] = {
@@ -127,10 +127,10 @@ EXPRESSION_HEAD: dict[str, dict[str, float]] = {
     "shy": {"yaw": -2.0, "pitch": -10.0, "roll": 5.0},
     "neutral": {"yaw": 0.0, "pitch": 0.0, "roll": 0.0},
     "calm": {"yaw": 0.0, "pitch": 0.0, "roll": 0.4},
-    "suppressed": {"yaw": 0.0, "pitch": 3.0, "roll": -1.0},
-    "doubtful": {"yaw": 2.5, "pitch": -1.0, "roll": 4.0},
-    "guilty": {"yaw": -2.0, "pitch": 4.0, "roll": 0.0},
-    "relieved": {"yaw": 0.0, "pitch": -1.0, "roll": 0.5},
+    "suppressed": {"yaw": 0.0, "pitch": 6.0, "roll": -2.0},
+    "doubtful": {"yaw": 4.0, "pitch": -2.0, "roll": 6.0},
+    "guilty": {"yaw": -3.0, "pitch": 7.0, "roll": 0.0},
+    "relieved": {"yaw": 0.0, "pitch": -2.0, "roll": 1.0},
 }
 
 
