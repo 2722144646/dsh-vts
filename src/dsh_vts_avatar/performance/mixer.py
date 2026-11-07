@@ -305,9 +305,9 @@ class PerformanceMixer:
             heads["y"] += mapping.get("FaceAngleY", 0.0) * mapping_strength
             heads["z"] += mapping.get("FaceAngleZ", 0.0) * mapping_strength
             mouth_open = max(mouth_open, mapping.get("MouthOpen", 0.0) * mapping_strength)
-        head_x = heads["x"] + actions.get("yaw", 0.0) * head_gain * self._speech_blend
-        head_y = heads["y"] + actions.get("pitch", 0.0) * head_gain * self._speech_blend
-        head_z = heads["z"] + actions.get("roll", 0.0) * head_gain * self._speech_blend
+        head_x = heads["x"] + actions.get("yaw", 0.0) * head_gain
+        head_y = heads["y"] + actions.get("pitch", 0.0) * head_gain
+        head_z = heads["z"] + actions.get("roll", 0.0) * head_gain
         if "eye_wide" in actions:
             eye_base = max(eye_base, clamp(actions["eye_wide"], 0.0, 1.0))
 
