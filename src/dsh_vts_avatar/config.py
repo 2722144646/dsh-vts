@@ -196,6 +196,16 @@ def _section(data: dict, name: str) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def _parse_audio_device(value: object) -> int | None:
+    """Accept an explicit device index, or None/"default"/"auto" for the system default."""
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in {"", "default", "auto", "system"}:
+        return None
+    return int(value)
+
+
 def load_config(path: str | Path | None = None) -> Config:
     """Load TOML config; relative paths resolve against the config file directory."""
     config_path = Path(path) if path else ROOT / "config.toml"
@@ -241,7 +251,7 @@ def load_config(path: str | Path | None = None) -> Config:
         noise_w_scale=float(tts_raw["noise_w_scale"]) if tts_raw.get("noise_w_scale") is not None else None,
     )
     cfg.audio = AudioConfig(
-        device=int(audio_raw["device"]) if audio_raw.get("device") is not None else None,
+        device=_parse_audio_device(audio_raw.get("device")),
         sample_rate=int(audio_raw.get("sample_rate", 48000)),
         buffer_ms=int(audio_raw.get("buffer_ms", 140)),
         av_offset_ms=int(audio_raw.get("av_offset_ms", 0)),
