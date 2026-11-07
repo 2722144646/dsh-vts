@@ -110,7 +110,7 @@ EXPRESSION_TARGETS: dict[str, dict[str, float]] = {
     "guilty": {"smile": 0.12, "eye": 0.38, "brow": 0.12, "angry": 0.0, "inner_brow": 0.85,
                "open": 0.0, "gaze_x": 0.45, "gaze_y": -0.25, "brow_l": 0.12, "brow_r": 0.12},
     # relieved: 不再自带笑；笑交给哈气动作，表情只留一点点放松。
-    "relieved": {"smile": 0.15, "eye": 0.52, "brow": 0.12, "angry": 0.0, "inner_brow": 0.04,
+    "relieved": {"smile": 0.15, "eye": 0.52, "brow": 0.575, "angry": 0.0, "inner_brow": 0.0,
                  "open": 0.0, "gaze_x": 0.0, "gaze_y": 0.06},
 }
 
