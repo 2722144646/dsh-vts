@@ -3988,3 +3988,5 @@
 {"t":1794060702.3704524,"kind":"state","labels":{"curious":1.0},"intensity":0.44999999999999996,"confidence":0.5999999999999999,"valence":0.25,"arousal":0.5,"hold_until":0.0,"source":"fusion","updated_at":1794060702.3696463,"applied":true}
 {"t":1794061815.1683345,"kind":"evidence","source":"tool","labels":{"calm":0.7,"happy":0.3},"intensity":0.6,"confidence":0.9,"note":"","turn_id":"","timestamp":1794061815.1682456}
 {"t":1794061815.1701894,"kind":"state","labels":{"calm":0.7,"happy":0.3},"intensity":0.6,"confidence":0.9,"valence":0.32999999999999996,"arousal":0.27,"hold_until":0.0,"source":"fusion","updated_at":1794061815.1683161,"applied":true}
+{"t":1794062149.4953368,"kind":"evidence","source":"tool","labels":{"sad":0.8,"wronged":0.2},"intensity":0.75,"confidence":0.9,"note":"","turn_id":"","timestamp":1794062149.4952505}
+{"t":1794062149.4977617,"kind":"state","labels":{"sad":0.8,"wronged":0.2},"intensity":0.9750000000000001,"confidence":0.9,"valence":-0.6299999999999999,"arousal":0.23000000000000004,"hold_until":0.0,"source":"fusion","updated_at":1794062149.495319,"applied":true}
