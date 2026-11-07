@@ -381,7 +381,10 @@ class PerformanceMixer:
                 # VTS's automatic lip-sync setup gates the mouth layer with
                 # ParamSilence. Keep it "not silent" for the whole spoken
                 # utterance so the layer does not flicker between words.
-                gate = 0.0 if self.state == "speaking" else 1.0
+                # 2026-11-07: an action that opens the mouth (e.g. sigh) must
+                # also lift the gate, otherwise MouthOpen is ignored at idle.
+                wants_mouth = actions.get("open", 0.0) > 0.01
+                gate = 0.0 if (self.state == "speaking" or wants_mouth) else 1.0
                 params[a.voice_silence] = self._sv(a.voice_silence, gate, dt, 0.18, 0.45)
         params[a.mouth_smile] = self._sv(a.mouth_smile, smile, dt, 0.18, 0.55)
         params[a.eye_left] = self._sv(a.eye_left, eye_base, dt, 0.07, 0.18)
