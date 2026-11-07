@@ -164,6 +164,13 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "sigh.play":
+            result = self.engine.play_sigh()
+            await ws.send(
+                orjson.dumps(
+                    {"type": "sigh.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "hotkey.list":
             result = await self.engine.hotkey_list()
             await ws.send(
