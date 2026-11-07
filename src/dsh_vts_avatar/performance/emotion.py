@@ -109,9 +109,9 @@ EXPRESSION_TARGETS: dict[str, dict[str, float]] = {
     # guilty: 心虚，夸张版：低头躲视线、内眉高提、嘴角收紧。
     "guilty": {"smile": 0.12, "eye": 0.38, "brow": 0.12, "angry": 0.0, "inner_brow": 0.85,
                "open": 0.0, "gaze_x": 0.45, "gaze_y": -0.25, "brow_l": 0.12, "brow_r": 0.12},
-    # relieved: 松了口气，夸张版：嘴角明显上扬、眼轻闭、眉舒展、微抬头。
-    "relieved": {"smile": 0.80, "eye": 0.40, "brow": 0.15, "angry": 0.0, "inner_brow": 0.05,
-                 "open": 0.10, "gaze_x": 0.0, "gaze_y": 0.10},
+    # relieved: 不再自带笑；笑交给哈气动作，表情只留一点点放松。
+    "relieved": {"smile": 0.15, "eye": 0.52, "brow": 0.12, "angry": 0.0, "inner_brow": 0.04,
+                 "open": 0.0, "gaze_x": 0.0, "gaze_y": 0.06},
 }
 
 EXPRESSION_HEAD: dict[str, dict[str, float]] = {

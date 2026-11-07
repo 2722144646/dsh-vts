@@ -274,7 +274,7 @@ class PerformanceMixer:
         blink = self._blink.update(now)
 
         smile = clamp(
-            emotional["smile"] + speech["form"] * 0.45 + actions.get("smile", 0.0) * 0.5,
+            emotional["smile"] + speech["form"] * 0.45 + actions.get("smile", 0.0) * 1.0,
             -1.0,
             1.0,
         )
