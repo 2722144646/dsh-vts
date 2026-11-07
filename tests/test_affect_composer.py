@@ -85,8 +85,6 @@ def test_mixer_uses_composer_only_when_affect_mode_is_on():
 
     legacy_mixer = PerformanceMixer(avatar, 48000)
     legacy_mixer.set_emotion("neutral", 0.5)
-    # 2026-11-07: affect idle is now smile-free (NEUTRAL_FACE smile 0.0);
-    # the legacy neutral path keeps the model's default smile.
     assert abs(legacy_mixer._emotion_targets()["smile"] - 0.5) < 1e-9
 
 
