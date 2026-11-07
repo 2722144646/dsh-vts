@@ -430,6 +430,8 @@ export function apply(ctx, config = {}) {
           'Describe how the avatar feels right now with weighted labels, e.g. {happy: 0.6, tired: 0.4}. ' +
           'This is a description, not a preset command: mixed labels blend into one face, and a low ' +
           'confidence value softens the expression instead of snapping to a full preset. ' +
+          'Nuanced labels are available too: suppressed (压着不说), doubtful (半信半疑), ' +
+          'guilty (心虚), relieved (松了口气). ' +
           'Optionally pass cause/why so the feeling keeps a reason in memory. ' +
           'Use vts_avatar_emote only when an exact preset has to be forced.',
         parameters: {

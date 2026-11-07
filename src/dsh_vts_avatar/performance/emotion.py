@@ -99,6 +99,19 @@ EXPRESSION_TARGETS: dict[str, dict[str, float]] = {
     "shy": {"smile": 0.75, "eye": 0.38, "brow": 0.14, "angry": 0.0, "inner_brow": 0.40, "open": 0.02, "gaze_x": -0.50, "gaze_y": 0.55, "brow_l": 0.24, "brow_r": 0.24},
     "neutral": {"smile": 0.14, "eye": 0.93, "brow": 0.10, "angry": 0.0, "inner_brow": 0.04, "open": 0.02},
     "calm": {"smile": 0.20, "eye": 0.90, "brow": 0.08, "angry": 0.0, "inner_brow": 0.06, "open": 0.02},
+    # --- nuanced L2 states (2026-11-07) ---------------------------------
+    # suppressed: 难过的“收着”版。嘴角压住不像哭，眼半垂，内眉微提。
+    "suppressed": {"smile": 0.18, "eye": 0.42, "brow": 0.18, "angry": 0.0, "inner_brow": 0.55,
+                   "open": 0.0, "gaze_x": 0.10, "gaze_y": -0.20, "brow_l": 0.18, "brow_r": 0.18},
+    # doubtful: 半信半疑。单边挑眉、眼睛微眯、头略偏。
+    "doubtful": {"smile": 0.32, "eye": 0.70, "brow": 0.50, "angry": 0.0, "inner_brow": 0.20,
+                 "open": 0.02, "gaze_x": 0.30, "gaze_y": 0.05, "brow_l": 0.55, "brow_r": 0.05},
+    # guilty: 心虚。眼往下、内眉上提、嘴角收紧。
+    "guilty": {"smile": 0.20, "eye": 0.45, "brow": 0.10, "angry": 0.0, "inner_brow": 0.65,
+               "open": 0.0, "gaze_x": 0.20, "gaze_y": -0.35, "brow_l": 0.20, "brow_r": 0.20},
+    # relieved: 松了口气。眉舒展、眼轻闭、嘴角微抬。
+    "relieved": {"smile": 0.62, "eye": 0.50, "brow": 0.25, "angry": 0.0, "inner_brow": 0.10,
+                 "open": 0.0, "gaze_x": 0.0, "gaze_y": 0.0},
 }
 
 EXPRESSION_HEAD: dict[str, dict[str, float]] = {
@@ -114,6 +127,10 @@ EXPRESSION_HEAD: dict[str, dict[str, float]] = {
     "shy": {"yaw": -2.0, "pitch": -10.0, "roll": 5.0},
     "neutral": {"yaw": 0.0, "pitch": 0.0, "roll": 0.0},
     "calm": {"yaw": 0.0, "pitch": 0.0, "roll": 0.4},
+    "suppressed": {"yaw": 0.0, "pitch": 3.0, "roll": -1.0},
+    "doubtful": {"yaw": 2.5, "pitch": -1.0, "roll": 4.0},
+    "guilty": {"yaw": -2.0, "pitch": 4.0, "roll": 0.0},
+    "relieved": {"yaw": 0.0, "pitch": -1.0, "roll": 0.5},
 }
 
 
