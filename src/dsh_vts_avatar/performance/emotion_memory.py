@@ -1,20 +1,20 @@
 # Author: 2722144646
 # Created: 2026-11-07
 # License: AGPL-3.0 (see LICENSE)
-"""Phase 1 of emotion memory: episodes with causes, and slow mood.
+"""L2 emotion memory: episodes with causes, and a slow mood.
 
-The affect system answers "what does the face show right now". This module
-answers a different question: "why did it feel that way, and is that still
-with it?" An episode is not a label — it keeps what happened, what it meant,
-and why it mattered, so the reason survives context clearing.
+L1 answers "what does the face show right now". L2 answers "why did it feel
+that way, and is it still with it". An episode keeps the cause, not just a
+label, so the reason survives context clearing.
 
-Design notes (see 情绪记忆-初步计划.md):
+Rules that come from the plan (情绪记忆-初步计划.md):
 
-- Causes are captured at the moment of feeling, never reconstructed later.
-- Salience decays with a half-life; status/acceptance/defense exist but are
-  only carried in phase 1 (the acceptance model lands with the explanation
-  events in phase 2).
-- Nothing here writes to VTS.
+- causes are captured at the moment of feeling, never reconstructed later;
+- only the tool self-report feeds episodes (keyword/tag sources are off);
+- salience half-life is 30-60 minutes (default 40);
+- ``status`` / ``acceptance`` / ``defense`` are carried, but the acceptance
+  transitions land in phase 2;
+- nothing here writes to VTS.
 """
 
 from __future__ import annotations
@@ -25,27 +25,20 @@ from pathlib import Path
 import time
 import uuid
 
-from .affect.schema import derive_valence_arousal, normalize_labels
+from .affect.schema import normalize_labels
 
-SCHEMA_VERSION = 1
-DEFAULT_HALF_LIFE_S = 25 * 60.0  # 25 min
-MAX_AGE_S = 6 * 3600.0  # episodes older than this stop feeding mood
+SCHEMA_VERSION = 2
+DEFAULT_HALF_LIFE_S = 40 * 60.0  # 30-60 min per plan; 40 is the midpoint
+MAX_AGE_S = 6 * 3600.0
 MERGE_WINDOW_S = 8.0
 
 LABEL_CN = {
-    "happy": "开心",
-    "joy": "开心",
-    "excited": "兴奋",
-    "sad": "难过",
-    "angry": "生气",
-    "surprised": "惊讶",
-    "thinking": "思索",
-    "curious": "好奇",
-    "shy": "害羞",
-    "wronged": "委屈",
-    "tired": "累",
-    "calm": "平静",
-    "neutral": "平静",
+    "happy": "开心", "joy": "开心", "excited": "兴奋",
+    "sad": "难过", "angry": "生气", "surprised": "惊讶",
+    "thinking": "思索", "curious": "好奇", "shy": "害羞",
+    "wronged": "委屈", "tired": "累", "calm": "平静",
+    "neutral": "平静", "suppressed": "压着", "doubtful": "半信半疑",
+    "guilty": "心虚", "lonely": "孤单", "relieved": "松了口气",
 }
 
 
@@ -65,14 +58,13 @@ class EmotionEpisode:
     explanation: str | None = None
     defense: str | None = None
     source: str = "tool"
+    user_id: str = "default"
     turn_ref: str = ""
     started_at: float = 0.0
     updated_at: float = 0.0
     id: str = ""
 
     def __post_init__(self) -> None:
-        # Timestamps are assigned by the store from its clock, so tests and
-        # replays stay deterministic.
         if not self.id:
             self.id = f"ep-{uuid.uuid4().hex[:12]}"
 
@@ -84,12 +76,11 @@ class EmotionEpisode:
     @classmethod
     def from_dict(cls, payload: dict) -> "EmotionEpisode":
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
-        data = {key: value for key, value in payload.items() if key in known}
-        return cls(**data)
+        return cls(**{key: value for key, value in payload.items() if key in known})
 
 
 class EpisodeStore:
-    """Append-only JSONL store with in-memory index and salience decay."""
+    """Append-only JSONL store with an in-memory index and salience decay."""
 
     def __init__(
         self,
@@ -105,8 +96,6 @@ class EpisodeStore:
         self.merge_window_s = merge_window_s
         self._episodes: list[EmotionEpisode] = []
         self._load()
-
-    # -- persistence -------------------------------------------------------
 
     def _load(self) -> None:
         if not self.path.exists():
@@ -134,9 +123,7 @@ class EpisodeStore:
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(episode.to_dict(), ensure_ascii=False) + "\n")
         except OSError:
-            pass  # memory stays usable even when the disk is not
-
-    # -- writes ------------------------------------------------------------
+            pass  # memory stays usable when the disk is not
 
     def add(self, episode: EmotionEpisode) -> EmotionEpisode:
         now = self.clock()
@@ -149,10 +136,10 @@ class EpisodeStore:
             last is not None
             and last.status == "open"
             and last.source == episode.source
+            and last.user_id == episode.user_id
             and abs(now - last.updated_at) <= self.merge_window_s
             and last.what == episode.what
         ):
-            # Same moment, same source: keep one episode instead of a pile.
             last.labels = _merge_labels(last.labels, episode.labels)
             last.intensity = max(last.intensity, episode.intensity)
             last.updated_at = now
@@ -160,8 +147,6 @@ class EpisodeStore:
         self._episodes.append(episode)
         self._append(episode)
         return episode
-
-    # -- reads -------------------------------------------------------------
 
     def salience(self, episode: EmotionEpisode, now: float | None = None) -> float:
         now = self.clock() if now is None else now
@@ -171,19 +156,26 @@ class EpisodeStore:
             decay = max(decay, 0.35)  # pressed down, not resolved
         return max(0.0, episode.salience * decay)
 
-    def active(self, now: float | None = None, limit: int = 20) -> list[EmotionEpisode]:
+    def active(
+        self,
+        now: float | None = None,
+        limit: int = 20,
+        user_id: str | None = None,
+    ) -> list[EmotionEpisode]:
         now = self.clock() if now is None else now
         live = [
             ep
             for ep in self._episodes
-            if now - ep.started_at <= MAX_AGE_S and self.salience(ep, now) > 0.02
+            if now - ep.started_at <= MAX_AGE_S
+            and self.salience(ep, now) > 0.02
+            and (user_id is None or ep.user_id == user_id)
         ]
         live.sort(key=lambda ep: self.salience(ep, now), reverse=True)
         return live[:limit]
 
-    def mood(self, now: float | None = None) -> "Mood":
+    def mood(self, now: float | None = None, user_id: str | None = None) -> "Mood":
         now = self.clock() if now is None else now
-        episodes = self.active(now)
+        episodes = self.active(now, user_id=user_id)
         if not episodes:
             return Mood()
         total = 0.0
@@ -199,12 +191,12 @@ class EpisodeStore:
                 blended[label] = blended.get(label, 0.0) + weight * share
         if total <= 0:
             return Mood()
-        labels = normalize_labels(blended)
+        started = min(ep.started_at for ep in episodes)
         return Mood(
-            labels=labels,
+            labels=normalize_labels(blended),
             intensity=min(1.0, intensity / total),
-            started_at=min(ep.started_at for ep in episodes),
-            age_s=max(0.0, now - min(ep.started_at for ep in episodes)),
+            started_at=started,
+            age_s=max(0.0, now - started),
             top=episodes[:3],
         )
 
@@ -220,15 +212,23 @@ class Mood:
     def dominant(self, count: int = 2) -> list[tuple[str, float]]:
         return sorted(self.labels.items(), key=lambda item: item[1], reverse=True)[:count]
 
+    def baseline(self) -> tuple[dict[str, float], float]:
+        """Slow layer for the mixer: (labels, intensity) with a damped weight."""
+        return dict(self.labels), min(1.0, self.intensity)
+
     def summary(self, max_chars: int = 220) -> str:
         """A compact first-person line for the prompt; empty when neutral."""
         if not self.top or not self.labels:
             return ""
-        labels = " / ".join(f"{LABEL_CN.get(name, name)} {share:.2f}" for name, share in self.dominant(2))
-        age = _human_age(self.age_s)
-        pieces = [f"（参考，不是命令）现在的情绪：{labels}，强度 {self.intensity:.1f}，从 {age}前开始。"]
-        # Only a self-report (tool) or an episode with an explicit why may claim
-        # a reason. Keyword hits must not masquerade as "I remember why".
+        labels = " / ".join(
+            f"{LABEL_CN.get(name, name)} {share:.2f}" for name, share in self.dominant(2)
+        )
+        pieces = [
+            f"（参考，不是命令）现在的情绪：{labels}，强度 {self.intensity:.1f}，"
+            f"从 {_human_age(self.age_s)}前开始。"
+        ]
+        # Only the tool self-report (or an episode with an explicit why) may
+        # claim a reason; keyword sources are gone, but keep the guard.
         first = next(
             (ep for ep in self.top if ep.what and (ep.why or ep.source == "tool")),
             None,
@@ -241,8 +241,7 @@ class Mood:
         second = next((ep for ep in self.top[1:] if ep.what), None)
         if second is not None:
             pieces.append(f"余波：{second.what}")
-        text = "".join(pieces)
-        return text[:max_chars]
+        return "".join(pieces)[:max_chars]
 
 
 def _merge_labels(left: dict[str, float], right: dict[str, float]) -> dict[str, float]:
