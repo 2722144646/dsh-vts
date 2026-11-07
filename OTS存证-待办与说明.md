@@ -1,7 +1,7 @@
 # OTS 存证：待办与说明（之后做）
 
 - 记录时间：2026-11-06
-- 状态：**已盖时间戳，待完成比特币锚定**（不是没做，是等日历聚合）
+- 状态：**已完成**。2026-11-07 09:15 执行 `ots upgrade` 成功，拿到 4 条比特币区块证明（block 974817 / 974819 / 974839 / 974847），已推送到 GitHub（commit `63816b6`）。
 - 关联仓库：`E:\avatar_feel`
 - 关联文档：`项目总计划.md`、`著作权登记-材料清单与待办.md`
 
@@ -24,37 +24,29 @@
 
 ---
 
-## 2. 差的那一步
-
-等几小时（通常 2–6 小时，取决于日历的聚合周期），在 `E:\avatar_feel` 下执行：
-
-```powershell
-cd E:\avatar_feel
-.venv\Scripts\ots.exe upgrade evidence\manifest.sha256.ots
-```
-
-**成功的样子**：
+## 2. 升级结果（2026-11-07 已完成）
 
 ```text
-Success! Bitcoin block 8xxxxx attests existence as of 2026-11-06 XX:XX:XX UTC
+$ ots upgrade evidence/manifest.sha256.ots
+Got 1 attestation(s) from https://finney.calendar.eternitywall.com
+Got 1 attestation(s) from https://alice.btc.calendar.opentimestamps.org
+Got 1 attestation(s) from https://bob.btc.calendar.opentimestamps.org
+Got 1 attestation(s) from https://btc.calendar.catallaxy.com
+Success! Timestamp complete
 ```
 
-**还是 pending 的样子**：
+写入证明的区块：
 
 ```text
-Calendar https://...: Pending confirmation in Bitcoin blockchain
-Failed! Timestamp not complete
+BitcoinBlockHeaderAttestation(974817)
+BitcoinBlockHeaderAttestation(974819)
+BitcoinBlockHeaderAttestation(974839)
+BitcoinBlockHeaderAttestation(974847)
 ```
 
-pending 就再等，不用改任何东西。
+`.ots` 从 1155 字节（pending）变成 5369 字节（完整）。最早锚定在 block 974817。
 
-成功之后：
-
-```powershell
-git add evidence/manifest.sha256.ots
-git commit -m "Complete OTS Bitcoin attestation"
-git push origin main
-```
+之后**每次发版**要再存证时，重复这个流程：重新生成清单 → `ots stamp` → 等几小时 → `ots upgrade`。
 
 ---
 
@@ -76,8 +68,9 @@ cd E:\avatar_feel
 
 ## 4. 注意事项
 
-1. **升级前不要重新生成 `manifest.sha256`**。一旦清单内容变了，哈希就对不上，旧证明作废。
-2. **每次发版再存证一次**：重新生成清单 → `ots stamp` → 等确认。多次存证形成时间链。
+1. **不要重新生成 `manifest.sha256` 之后继续用这份旧 `.ots` 当证明**。内容变了哈希就对不上；
+   想再存证就重新生成清单并 `ots stamp` 一次，旧证明留作历史版本。
+2. **每次发版再存证一次**：重新生成清单 → `ots stamp` → 等确认 → `ots upgrade`。多次存证形成时间链。
 3. 本机 `.venv` 里的 `python-bitcoinlib` 打过 Windows 补丁（找不到 OpenSSL 时用 `MagicMock` 占位），
    只影响本机工具，不影响证明本身。换机器重装 `opentimestamps-client` 时如果 import 崩溃，照此处理。
 4. 时间戳证明的是“内容在某时刻前已存在”，不证明“你是谁”；作者身份靠仓库提交、版权声明和软著登记补。
@@ -86,11 +79,11 @@ cd E:\avatar_feel
 
 ## 5. 之后要做的事（清单）
 
-- [ ] 等日历确认后执行 `ots upgrade`
-- [ ] 确认输出包含 `Success! Bitcoin block ...`
-- [ ] 提交并推送 `.ots`
+- [x] 执行 `ots upgrade`（2026-11-07 09:15）
+- [x] 确认输出 `Success! Timestamp complete`，区块 974817–974847
+- [x] 提交并推送 `.ots`（avatar_feel commit `63816b6`）
 - [ ] 下次发版时重新 `ots stamp`，保持时间链
-- [ ] 若升级长期失败（日历异常），改用国内可信时间戳服务或区块链存证平台重做一次
+- [ ] 若之后升级长期失败（日历异常），改用国内可信时间戳服务或区块链存证平台重做一次
 
 ---
 
