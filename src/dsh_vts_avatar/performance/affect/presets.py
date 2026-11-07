@@ -25,6 +25,10 @@ ANCHORS: dict[str, tuple[float, float]] = {
     "shy": (0.20, 0.35),
     "neutral": (0.00, 0.15),
     "calm": (0.15, 0.15),
+    "suppressed": (-0.45, 0.20),
+    "doubtful": (-0.10, 0.35),
+    "guilty": (-0.35, 0.30),
+    "relieved": (0.35, 0.20),
 }
 
 # Unknown labels must not silently become a strong emotion. They fall back to
@@ -65,6 +69,17 @@ LABEL_ALIASES: dict[str, str] = {
     "困": "tired",
     "中性": "neutral",
     "平静": "calm",
+    "压抑": "suppressed",
+    "压着": "suppressed",
+    "忍着": "suppressed",
+    "半信半疑": "doubtful",
+    "怀疑": "doubtful",
+    "心虚": "guilty",
+    "内疚": "guilty",
+    "愧疚": "guilty",
+    "松了口气": "relieved",
+    "释然": "relieved",
+    "放心": "relieved",
 }
 
 
