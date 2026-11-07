@@ -104,6 +104,23 @@ class _StubMixer:
         pass
 
 
+def test_keyword_hit_does_not_claim_a_reason(tmp_path):
+    now = [1000.0]
+    store = EpisodeStore(tmp_path / "e.jsonl", clock=lambda: now[0])
+    store.add(
+        EmotionEpisode(
+            what="好累啊",
+            labels={"tired": 1.0},
+            intensity=0.6,
+            salience=0.6,
+            source="keyword",
+        )
+    )
+    text = store.mood(now[0]).summary()
+    assert "累" in text
+    assert "为什么" not in text
+
+
 def test_engine_feel_records_why_and_exposes_mood(tmp_path):
     from dsh_vts_avatar.bridge.engine import AvatarEngine
     from dsh_vts_avatar.config import Config, EmotionConfig
