@@ -6,7 +6,21 @@
 
 const DEFAULT_BRIDGE_URL = 'ws://127.0.0.1:8765';
 
-export const inject = ['tools'];
+// Soft, optional guidance for the emotion self-report channel. Deliberately not
+// a rule: not expressing is also an expression, so the model may stay silent.
+const EMOTION_GUIDANCE = [
+  '## 情绪自述（可选，不强制）',
+  '',
+  '你可以用 vts_avatar_feel 描述此刻的情绪。labels 是权重字典，例如 {"happy": 0.6, "tired": 0.4}，',
+  '可以带 intensity、confidence、note。',
+  '',
+  '- 不调用同样合法：沉默、克制、没有情绪本身就是一种表达，不需要为了“有反应”硬填一个词。',
+  '- 可以混合、可以不确定、可以低置信度；不必讨好。',
+  '- 不需要每句话都调用；觉得情绪有变化时写一次即可，尽量在回复开始前，让表情和话音同步。',
+  '- note 只写进日志，不会被念出来。',
+].join('\n');
+
+export const inject = ['tools', 'systemPrompt'];
 
 function sessionIdOf(agent) {
   return String(
@@ -213,6 +227,11 @@ export function apply(ctx, config = {}) {
     client.start();
 
     const disposers = [
+      ctx.systemPrompt.section({
+        name: 'plugin:dsh-vts-avatar',
+        order: 250,
+        text: EMOTION_GUIDANCE,
+      }),
       ctx.tools.register({
         name: 'vts_avatar_look',
         description:

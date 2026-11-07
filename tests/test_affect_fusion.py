@@ -1,4 +1,9 @@
-from dsh_vts_avatar.performance.affect import AffectEvidence, AffectFusion, AffectState
+from dsh_vts_avatar.performance.affect import (
+    SOURCE_WEIGHTS,
+    AffectEvidence,
+    AffectFusion,
+    AffectState,
+)
 
 
 def _clock():
@@ -83,3 +88,12 @@ def test_empty_fusion_is_neutral():
     state = AffectFusion().state()
     assert state.labels == {"neutral": 1.0}
     assert state.intensity == 0.0
+
+
+def test_tool_self_report_has_the_highest_weight():
+    # The AI's own reading is the only source that saw the conversation.
+    assert max(SOURCE_WEIGHTS.values()) == SOURCE_WEIGHTS["tool"]
+    assert SOURCE_WEIGHTS["tool"] > SOURCE_WEIGHTS["tag"]
+    assert SOURCE_WEIGHTS["tool"] > SOURCE_WEIGHTS["keyword"]
+    # manual is a user command, handled by the override path, not a vote.
+    assert "manual" not in SOURCE_WEIGHTS
