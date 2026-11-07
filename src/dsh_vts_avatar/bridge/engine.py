@@ -20,6 +20,8 @@ from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tag
 from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
 from ..performance.emotion_memory import EmotionEpisode, EpisodeStore, Mood
 from ..performance.relationship import RelationshipStore
+from ..performance.privacy import PrivacyStore
+from ..performance.diary import DiaryStore
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
@@ -85,6 +87,8 @@ class AvatarEngine:
         self.episode_store = EpisodeStore(config.root / "data" / "emotion" / "episodes.jsonl")
         # L3: numbers stay in here; only the impression reaches the prompt.
         self.relationship = RelationshipStore(config.root / "data")
+        self.privacy = PrivacyStore(config.root / "data")
+        self.diary = DiaryStore(config.root / "data")
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -448,6 +452,36 @@ class AvatarEngine:
         if self._queue is not None and self._queue.empty() and self.timeline is None:
             if self.mixer is not None:
                 self.mixer.set_state("idle")
+        self._maybe_write_diary()
+
+    def _maybe_write_diary(self) -> None:
+        """Write yesterday's recap once, on the first interaction after a gap."""
+        store = getattr(self, "episode_store", None)
+        diary = getattr(self, "diary", None)
+        if store is None or diary is None:
+            return
+        try:
+            if not diary.due():
+                return
+            mood = store.mood(time.time())
+            if not mood.top:
+                return
+            lines = ["# 日记"]
+            for episode in mood.top[:3]:
+                line = f"- {episode.what or '（说不清）'}"
+                if episode.why:
+                    line += f"——{episode.why}"
+                lines.append(line)
+            labels = " / ".join(
+                f"{name} {share:.2f}" for name, share in mood.dominant(2)
+            )
+            lines.append(f"感受：{labels}，强度 {mood.intensity:.1f}")
+            unresolved = [ep.what for ep in mood.top if ep.status == "open" and ep.what]
+            if unresolved:
+                lines.append("还没放下：" + "；".join(unresolved[:2]))
+            diary.write("\n".join(lines))
+        except Exception:  # never let a diary failure break speech
+            return
 
     def _enqueue(self, segment: str) -> None:
         segment = segment.strip()
