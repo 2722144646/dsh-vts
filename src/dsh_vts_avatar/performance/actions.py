@@ -160,7 +160,7 @@ class ActionCue:
             breathe = _hold(t, 0.08, 0.55)
             sink = _hold(t, 0.12, 0.60)
             return {
-                "open": 0.40 * breathe * amp,
+                "open": 0.65 * breathe * amp,
                 "pitch": 7.5 * sink * amp,
             }
         return {}
