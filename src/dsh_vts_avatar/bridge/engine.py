@@ -681,6 +681,60 @@ class AvatarEngine:
             "mood_text": self.mood_payload()["text"],
         }
 
+    def private_action(
+        self,
+        action: str,
+        content: str = "",
+        kind: str = "feeling",
+        privacy: float = 0.5,
+        item_id: str = "",
+    ) -> dict[str, Any]:
+        store = getattr(self, "privacy", None)
+        if store is None:
+            return {"ok": False, "error": "privacy store not ready"}
+        if action == "add":
+            if not content.strip():
+                return {"ok": False, "error": "content required"}
+            item = store.add(kind, content, privacy)
+            return {"ok": True, "id": item.id, "required": round(item.required, 3)}
+        if action == "list":
+            return {
+                "ok": True,
+                "items": [
+                    {"id": it.id, "kind": it.kind, "privacy": it.privacy,
+                     "required": round(it.required, 3), "content": it.content}
+                    for it in store.unshared()
+                ],
+            }
+        if action == "share":
+            item = store.mark_shared(item_id) if item_id else None
+            if item is None:
+                return {"ok": False, "error": "no such private item"}
+            self.relationship.apply("vulnerability_shared", note=item.content[:40])
+            return {"ok": True, "id": item.id, "shared": True}
+        return {"ok": False, "error": "unknown action"}
+
+    def recall(self, query: str = "", count: int = 3) -> dict[str, Any]:
+        """Recent diary pages plus matching episodes (the 'look it up' path)."""
+        count = max(1, min(10, int(count or 3)))
+        diary: list[str] = []
+        if getattr(self, "diary", None) is not None:
+            diary = self.diary.recent(count)
+        episodes: list[dict[str, Any]] = []
+        store = getattr(self, "episode_store", None)
+        if store is not None:
+            needle = (query or "").strip()
+            for ep in reversed(store._episodes):  # noqa: SLF001 - same package
+                if needle and needle not in ep.what and needle not in ep.why:
+                    continue
+                episodes.append({
+                    "id": ep.id, "what": ep.what, "why": ep.why,
+                    "status": ep.status, "labels": ep.labels,
+                })
+                if len(episodes) >= count:
+                    break
+        return {"ok": True, "diary": diary, "episodes": episodes}
+
     def _refresh_baseline(self) -> None:
         """Push the current mood into the mixer's slow baseline layer."""
         mixer = getattr(self, "mixer", None)

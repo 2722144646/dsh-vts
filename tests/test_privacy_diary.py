@@ -2,6 +2,35 @@ from dsh_vts_avatar.performance.diary import DiaryStore
 from dsh_vts_avatar.performance.privacy import PrivacyStore, trust_required
 
 
+def test_engine_private_add_list_share(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    engine = AvatarEngine(config)
+    added = engine.private_action("add", content="我很怕他不来了", kind="feeling", privacy=0.8)
+    assert added["ok"] is True
+    listed = engine.private_action("list")
+    assert len(listed["items"]) == 1
+    shared = engine.private_action("share", item_id=added["id"])
+    assert shared["ok"] is True
+    assert engine.private_action("list")["items"] == []
+
+
+def test_engine_recall_returns_diary_and_episodes(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    engine = AvatarEngine(config)
+    engine.diary.write("# 日记\n- 他说你根本不在乎", now=1000.0)
+    result = engine.recall(query="不在乎")
+    assert result["ok"] is True
+    assert result["diary"]
+
+
 def test_privacy_trust_threshold_and_share(tmp_path):
     store = PrivacyStore(tmp_path, "u1")
     item = store.add("feeling", "我其实很怕他哪天不来了", privacy=0.8)

@@ -164,8 +164,30 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
-        elif mtype == "explain":
-            # Phase 2: how an explanation landed (model judges acceptance).
+        elif mtype == "private":
+            result = self.engine.private_action(
+                action=str(msg.get("action") or "list"),
+                content=str(msg.get("content") or ""),
+                kind=str(msg.get("kind") or "feeling"),
+                privacy=float(msg.get("privacy", 0.5)),
+                item_id=str(msg.get("item_id") or ""),
+            )
+            await ws.send(
+                orjson.dumps(
+                    {"type": "private.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
+        elif mtype == "recall":
+            result = self.engine.recall(
+                query=str(msg.get("query") or ""),
+                count=int(msg.get("count", 3)),
+            )
+            await ws.send(
+                orjson.dumps(
+                    {"type": "recall.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
+        elif mtype == "explain":            # Phase 2: how an explanation landed (model judges acceptance).
             result = self.engine.explain(
                 explanation=str(msg.get("explanation") or ""),
                 acceptance=float(msg["acceptance"]) if msg.get("acceptance") is not None else None,
