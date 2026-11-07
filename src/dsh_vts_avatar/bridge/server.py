@@ -135,18 +135,32 @@ class BridgeServer:
                 float(msg.get("intensity", 0.7)),
             )
         elif mtype == "feel":
-            # Phase 3: weighted labels + confidence + note. The bridge answers
-            # with the derived state so the tool can report what it applied.
+            # Phase 3: weighted labels + confidence + note. Phase 1 of emotion
+            # memory also carries cause/why, captured at the moment of feeling.
             result = self.engine.feel(
                 labels=msg.get("labels") if isinstance(msg.get("labels"), dict) else {},
                 intensity=float(msg.get("intensity", 0.7)),
                 confidence=float(msg.get("confidence", 0.8)),
                 note=str(msg.get("note") or ""),
                 turn_id=str(msg.get("turn_id") or ""),
+                cause=str(msg.get("cause") or ""),
+                why=str(msg.get("why") or ""),
+                appraisal=msg.get("appraisal") if isinstance(msg.get("appraisal"), list) else None,
             )
             await ws.send(
                 orjson.dumps(
                     {"type": "feel.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
+        elif mtype == "mood.get":
+            # Emotion memory: current mood plus the reasons behind it.
+            await ws.send(
+                orjson.dumps(
+                    {
+                        "type": "mood.result",
+                        "request_id": msg.get("request_id"),
+                        **self.engine.mood_payload(),
+                    }
                 ).decode("utf-8")
             )
         elif mtype == "record":

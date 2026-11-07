@@ -42,6 +42,7 @@ class BridgeClient {
     this.lastStatus = null;
     this.pending = new Map();
     this.nextRequest = 1;
+    this.mood = null;
   }
 
   start() {
@@ -78,6 +79,17 @@ class BridgeClient {
       if (message.type === 'hello.ack' || message.type === 'ready') {
         this.lastStatus = message.status ?? message;
         console.info('[vts-avatar] bridge ready:', JSON.stringify(this.lastStatus));
+        this.request('mood.get').catch(() => {});
+      } else if (message.type === 'mood.result') {
+        this.setMood(message.text);
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
+      } else if (message.type === 'mood.update') {
+        this.setMood(message.text);
       } else if (message.type === 'snapshot.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -133,6 +145,11 @@ class BridgeClient {
       console.warn('[vts-avatar] send failed:', error);
       return false;
     }
+  }
+
+  /** Cache the latest mood summary so the prompt context can be computed. */
+  setMood(text) {
+    this.mood = { text: String(text || ''), at: Date.now() };
   }
 
   request(type, payload = {}, timeoutMs = 5000) {
@@ -227,6 +244,17 @@ export function apply(ctx, config = {}) {
     client.start();
 
     const disposers = [
+      ctx.systemPrompt.context({
+        name: 'plugin:dsh-vts-avatar:mood',
+        order: 260,
+        text: () => {
+          const mood = client.mood;
+          if (!mood || !mood.text) return '';
+          // Stale summaries would pin an old feeling on the model forever.
+          if (Date.now() - mood.at > 10 * 60 * 1000) return '';
+          return mood.text;
+        },
+      }),
       ctx.systemPrompt.section({
         name: 'plugin:dsh-vts-avatar',
         order: 250,
@@ -388,6 +416,7 @@ export function apply(ctx, config = {}) {
           'Describe how the avatar feels right now with weighted labels, e.g. {happy: 0.6, tired: 0.4}. ' +
           'This is a description, not a preset command: mixed labels blend into one face, and a low ' +
           'confidence value softens the expression instead of snapping to a full preset. ' +
+          'Optionally pass cause/why so the feeling keeps a reason in memory. ' +
           'Use vts_avatar_emote only when an exact preset has to be forced.',
         parameters: {
           type: 'object',
@@ -412,6 +441,21 @@ export function apply(ctx, config = {}) {
             note: {
               type: 'string',
               description: 'Short reason for the affect log only; never spoken.',
+            },
+            cause: {
+              type: 'string',
+              description:
+                'What happened, in one short sentence (e.g. 他说“你根本不在乎”). Optional, '
+                + 'but this is the reason kept in memory — without it the feeling has no cause later.',
+            },
+            why: {
+              type: 'string',
+              description: 'Why it mattered to you (e.g. 我觉得被否定). Optional.',
+            },
+            appraisal: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Optional appraisal words, e.g. ["被否定","委屈"].',
             },
           },
           required: ['labels'],
@@ -443,7 +487,11 @@ export function apply(ctx, config = {}) {
               intensity: Number(args?.intensity ?? 0.7),
               confidence: Number(args?.confidence ?? 0.8),
               note: String(args?.note ?? ''),
+              cause: String(args?.cause ?? ''),
+              why: String(args?.why ?? ''),
+              appraisal: Array.isArray(args?.appraisal) ? args.appraisal.map(String) : [],
             });
+            if (result?.mood_text) client.setMood(result.mood_text);
             return { ...result, ok: result?.ok !== false };
           } catch (error) {
             return { ok: false, error: String(error?.message ?? error) };

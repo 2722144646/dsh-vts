@@ -17,6 +17,7 @@ from ..config import Config
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
 from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
+from ..performance.emotion_memory import EmotionEpisode, EpisodeStore, Mood
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
@@ -78,6 +79,8 @@ class AvatarEngine:
         # Phase 4: sources vote; nothing except a manual instruction outranks
         # another source. See 用户原话与共识.md for the requirement.
         self.fusion = AffectFusion()
+        # Emotion memory (phase 1): one episode per felt moment, keeping why.
+        self.episode_store = EpisodeStore(config.root / "data" / "emotion" / "episodes.jsonl")
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -549,6 +552,79 @@ class AvatarEngine:
         self.affect_log.evidence(evidence)
         self.affect_log.state(state, applied=True)
         self.mixer.set_affect(state)
+        # Keyword / tag hits become low-confidence episodes: the reason is only
+        # the matched phrase, so `why` stays empty and the source is honest.
+        snippet = self._affect_buffer.strip()
+        if snippet:
+            snippet = snippet[-24:]
+        self._remember(
+            what=snippet or label,
+            labels=state.labels,
+            intensity=state.intensity,
+            confidence=confidence,
+            source=source,
+        )
+
+    def _remember(
+        self,
+        *,
+        what: str,
+        why: str = "",
+        appraisal: list[str] | None = None,
+        labels: dict[str, float] | None = None,
+        intensity: float = 0.0,
+        confidence: float = 0.0,
+        source: str = "tool",
+        turn_ref: str = "",
+    ) -> None:
+        """Record one remembered moment (emotion memory phase 1)."""
+        store = getattr(self, "episode_store", None)
+        if store is None:
+            return
+        clean_labels = dict(labels or {})
+        matters = any(
+            share >= 0.2 and name not in ("neutral", "calm")
+            for name, share in clean_labels.items()
+        )
+        if not what.strip() and not matters:
+            return
+        store.add(
+            EmotionEpisode(
+                what=what.strip(),
+                why=why.strip(),
+                appraisal=list(appraisal or []),
+                labels=clean_labels,
+                intensity=max(0.0, min(1.0, float(intensity))),
+                confidence=max(0.0, min(1.0, float(confidence))),
+                salience=max(0.15, min(1.0, float(intensity))),
+                source=source,
+                turn_ref=turn_ref,
+            )
+        )
+
+    def mood_payload(self, limit: int = 3) -> dict[str, Any]:
+        """Current mood + what caused it, for the plugin's prompt context."""
+        store = getattr(self, "episode_store", None)
+        now = time.time()
+        mood = store.mood(now) if store is not None else Mood()
+        return {
+            "ok": True,
+            "text": mood.summary(),
+            "labels": mood.labels,
+            "intensity": round(mood.intensity, 4),
+            "age_s": round(mood.age_s, 1),
+            "episodes": [
+                {
+                    "what": episode.what,
+                    "why": episode.why,
+                    "labels": episode.labels,
+                    "intensity": round(episode.intensity, 3),
+                    "age_s": round(max(0.0, now - episode.started_at), 1),
+                    "status": episode.status,
+                }
+                for episode in mood.top[:limit]
+            ],
+        }
 
     def feel(
         self,
@@ -557,6 +633,9 @@ class AvatarEngine:
         confidence: float = 0.8,
         note: str = "",
         turn_id: str = "",
+        cause: str = "",
+        why: str = "",
+        appraisal: list[str] | None = None,
     ) -> dict[str, Any]:
         """Describe the current emotional state (Phase 3).
 
@@ -564,6 +643,10 @@ class AvatarEngine:
         not a preset name. In ``affect`` mode it becomes one evidence record and
         the composer blends it; in ``legacy`` mode it degrades to the dominant
         preset so old behavior and old logs stay comparable.
+
+        ``cause`` / ``why`` are the emotion-memory fields: what happened and why
+        it mattered. They are captured here, at the moment of feeling — never
+        reconstructed later.
         """
         evidence = AffectEvidence(
             source="tool",
@@ -598,6 +681,18 @@ class AvatarEngine:
             self.affect_log.state(state, applied=True, mode="legacy")
             self.mixer.set_emotion(dominant, state.intensity)
 
+        if self.config.emotion.is_affect:
+            self._remember(
+                what=cause,
+                why=why,
+                appraisal=appraisal,
+                labels=state.labels,
+                intensity=state.intensity,
+                confidence=confidence,
+                source="tool",
+                turn_ref=turn_id,
+            )
+
         return {
             "ok": True,
             "mode": self.config.emotion.mode,
@@ -607,6 +702,7 @@ class AvatarEngine:
             "confidence": state.confidence,
             "valence": round(state.valence, 4),
             "arousal": round(state.arousal, 4),
+            "mood_text": self.mood_payload()["text"],
         }
 
     async def record_expression(self, name: str, seconds: float = 4.0) -> dict[str, Any]:
