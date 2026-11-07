@@ -116,6 +116,11 @@ class EpisodeStore:
                 self._episodes.append(EmotionEpisode.from_dict(payload))
             except TypeError:
                 continue
+        # Later revisions share the episode id and win.
+        deduped: dict[str, EmotionEpisode] = {}
+        for ep in self._episodes:
+            deduped[ep.id] = ep
+        self._episodes = list(deduped.values())
 
     def _append(self, episode: EmotionEpisode) -> None:
         try:
@@ -151,10 +156,39 @@ class EpisodeStore:
     def salience(self, episode: EmotionEpisode, now: float | None = None) -> float:
         now = self.clock() if now is None else now
         age = max(0.0, now - episode.started_at)
-        decay = 0.5 ** (age / max(1.0, self.half_life_s))
+        half_life = self.half_life_s
+        if episode.status == "accepted":
+            half_life = max(1.0, half_life / 3.0)  # healing fades faster than time
+        decay = 0.5 ** (age / max(1.0, half_life))
         if episode.status == "suppressed":
             decay = max(decay, 0.35)  # pressed down, not resolved
         return max(0.0, episode.salience * decay)
+
+    def find(self, episode_id: str | None = None) -> EmotionEpisode | None:
+        if episode_id:
+            return next((ep for ep in reversed(self._episodes) if ep.id == episode_id), None)
+        return next((ep for ep in reversed(self._episodes) if ep.status == "open"), None)
+
+    def revise(
+        self,
+        episode: EmotionEpisode,
+        *,
+        explanation: str | None = None,
+        acceptance: float | None = None,
+        status: str | None = None,
+        defense: str | None = None,
+    ) -> EmotionEpisode:
+        if explanation is not None:
+            episode.explanation = explanation
+        if acceptance is not None:
+            episode.acceptance = max(0.0, min(1.0, acceptance))
+        if status is not None:
+            episode.status = status
+        if defense is not None:
+            episode.defense = defense
+        episode.updated_at = self.clock()
+        self._append(episode)
+        return episode
 
     def active(
         self,

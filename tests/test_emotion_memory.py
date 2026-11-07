@@ -121,6 +121,38 @@ def test_keyword_hit_does_not_claim_a_reason(tmp_path):
     assert "为什么" not in text
 
 
+def test_engine_explain_marks_latest_open(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    engine = AvatarEngine(config)
+    engine.mixer = _StubMixer()
+    engine.feel({"sad": 0.8}, intensity=0.8, cause="他说你根本不在乎")
+    result = engine.explain(explanation="我那天太累了，不是针对你", acceptance=0.7, status="accepted")
+    assert result["ok"] is True
+    assert result["status"] == "accepted"
+
+
+def test_revise_fades_faster_when_accepted(tmp_path):
+    now = [1000.0]
+    store = EpisodeStore(tmp_path / "e.jsonl", clock=lambda: now[0], half_life_s=60.0)
+    episode = store.add(
+        EmotionEpisode(what="a", labels={"sad": 1.0}, intensity=0.8, salience=0.8)
+    )
+    now[0] += 120.0
+    open_salience = store.salience(episode, now[0])
+    store.revise(episode, explanation="我不是针对你", acceptance=0.8, status="accepted")
+    assert store.salience(episode, now[0]) < open_salience  # healing fades faster
+
+    reloaded = EpisodeStore(tmp_path / "e.jsonl", clock=lambda: now[0], half_life_s=60.0)
+    found = reloaded.find(episode.id)
+    assert found is not None
+    assert found.status == "accepted"
+    assert found.acceptance == pytest.approx(0.8)
+
+
 def test_engine_feel_records_why_and_exposes_mood(tmp_path):
     from dsh_vts_avatar.bridge.engine import AvatarEngine
     from dsh_vts_avatar.config import Config, EmotionConfig
