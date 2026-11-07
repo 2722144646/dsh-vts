@@ -640,8 +640,33 @@ class AvatarEngine:
             "mood_text": self.mood_payload()["text"],
         }
 
+    def _refresh_baseline(self) -> None:
+        """Push the current mood into the mixer's slow baseline layer."""
+        mixer = getattr(self, "mixer", None)
+        if mixer is None or not hasattr(mixer, "set_baseline"):
+            return
+        weight = float(getattr(self.config.avatar, "baseline_weight", 0.0))
+        store = getattr(self, "episode_store", None)
+        if store is None or weight <= 0:
+            mixer.set_baseline(None, 0.0)
+            return
+        mood = store.mood(time.time())
+        if not mood.labels:
+            mixer.set_baseline(None, 0.0)
+            return
+        mixer.set_baseline(
+            AffectState(
+                labels=dict(mood.labels),
+                intensity=mood.intensity,
+                confidence=1.0,
+                source="mood",
+            ),
+            weight,
+        )
+
     def mood_payload(self, limit: int = 3) -> dict[str, Any]:
         """Current mood + what caused it, for the plugin's prompt context."""
+        self._refresh_baseline()
         store = getattr(self, "episode_store", None)
         now = time.time()
         mood = store.mood(now) if store is not None else Mood()
