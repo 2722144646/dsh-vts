@@ -4014,3 +4014,9 @@
 {"t":1794063782.311309,"kind":"state","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.35,"arousal":0.3,"hold_until":0.0,"source":"fusion","updated_at":1794063782.3103623,"applied":true}
 {"t":1794063793.8092413,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063793.8091853}
 {"t":1794063793.8102849,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794063793.8092306,"applied":true}
+{"t":1794063924.9629648,"kind":"evidence","source":"tool","labels":{"suppressed":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063924.9628322}
+{"t":1794063924.96525,"kind":"state","labels":{"suppressed":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.45,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794063924.9629385,"applied":true}
+{"t":1794063936.3860848,"kind":"evidence","source":"tool","labels":{"doubtful":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063936.3860123}
+{"t":1794063936.3886333,"kind":"state","labels":{"doubtful":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.1,"arousal":0.35,"hold_until":0.0,"source":"fusion","updated_at":1794063936.386071,"applied":true}
+{"t":1794063948.273717,"kind":"evidence","source":"tool","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794063948.273661}
+{"t":1794063948.2750552,"kind":"state","labels":{"guilty":1.0},"intensity":1.0,"confidence":1.0,"valence":-0.35,"arousal":0.3,"hold_until":0.0,"source":"fusion","updated_at":1794063948.2737083,"applied":true}
