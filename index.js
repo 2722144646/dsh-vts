@@ -111,6 +111,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
+      } else if (message.type === 'private.result' || message.type === 'recall.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'feel.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -581,6 +588,76 @@ export function apply(ctx, config = {}) {
           } catch (error) {
             return { ok: false, error: String(error?.message ?? error) };
           }
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_private',
+        description:
+          'Keep or share your own private things. action=add puts something on your private list ' +
+          '(content, kind, privacy 0-1); list shows what is unshared; share marks an item shared ' +
+          'when you choose to tell him. Trust is only a suggestion — the choice is yours.',
+        parameters: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['add', 'list', 'share'] },
+            content: { type: 'string', description: 'What is private, one short sentence.' },
+            kind: { type: 'string', enum: ['feeling', 'memory', 'opinion', 'fact'] },
+            privacy: { type: 'number', minimum: 0, maximum: 1 },
+            item_id: { type: 'string', description: 'For action=share.' },
+          },
+          required: ['action'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => {
+            if (value?.ok === false) {
+              return [{ type: 'text', text: `Private failed: ${value?.error ?? 'unknown error'}` }];
+            }
+            if (Array.isArray(value?.items)) {
+              return [{ type: 'text', text: `${value.items.length} private item(s) not shared` }];
+            }
+            return [{ type: 'text', text: `ok ${value?.id ?? ''}`.trim() }];
+          },
+        },
+        async execute(args) {
+          const result = await client.request('private', {
+            action: String(args?.action ?? 'list'),
+            content: String(args?.content ?? ''),
+            kind: String(args?.kind ?? 'feeling'),
+            privacy: Number(args?.privacy ?? 0.5),
+            item_id: String(args?.item_id ?? ''),
+          });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_recall',
+        description:
+          'Look up older memory when detail matters: recent diary pages and episodes matching a query.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Optional text to match in what/why.' },
+            count: { type: 'number', minimum: 1, maximum: 10 },
+          },
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: `recall: ${value?.episodes?.length ?? 0} episode(s), ${value?.diary?.length ?? 0} diary page(s)`,
+          }],
+        },
+        async execute(args) {
+          const result = await client.request('recall', {
+            query: String(args?.query ?? ''),
+            count: Number(args?.count ?? 3),
+          });
+          return { ...result, ok: result?.ok !== false };
         },
       }),
 
