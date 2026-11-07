@@ -227,7 +227,12 @@ class Mood:
         labels = " / ".join(f"{LABEL_CN.get(name, name)} {share:.2f}" for name, share in self.dominant(2))
         age = _human_age(self.age_s)
         pieces = [f"（参考，不是命令）现在的情绪：{labels}，强度 {self.intensity:.1f}，从 {age}前开始。"]
-        first = next((ep for ep in self.top if ep.what), None)
+        # Only a self-report (tool) or an episode with an explicit why may claim
+        # a reason. Keyword hits must not masquerade as "I remember why".
+        first = next(
+            (ep for ep in self.top if ep.what and (ep.why or ep.source == "tool")),
+            None,
+        )
         if first is not None:
             reason = first.what
             if first.why:
