@@ -117,6 +117,9 @@ class PerformanceMixer:
         self._state_bias = {"x": 0.0, "y": 0.0, "z": 0.0}
         self._speech_blend = 0.0
         self._speech_target = 0.0
+        # Phase 2 baseline: slow mood layer under the transient affect.
+        self.baseline = None
+        self.baseline_weight = 0.0
         self._affect_stamp = 0.0
         self._last_turn_sample = -10**9
         self._mouth_backend = self._decide_backend()
@@ -176,6 +179,11 @@ class PerformanceMixer:
         """Attach the continuous affect state used by the composer path."""
         self.affect = state
         self._affect_stamp = time.time()
+
+    def set_baseline(self, state: AffectState | None, weight: float = 0.0) -> None:
+        """Attach the slow mood baseline; 0 disables it and restores old behavior."""
+        self.baseline = state
+        self.baseline_weight = max(0.0, min(1.0, float(weight)))
 
     #: How long a described feeling holds before it starts fading, and the
     #: release time constant. Evidence only arrives when someone speaks, so
@@ -588,7 +596,19 @@ class PerformanceMixer:
         if self.use_affect and self.affect is not None:
             # Phase 2: multi-label blend; the neutral base and the intensity
             # ramp live in the composer, not here.
-            return compose_face(self.affect, self._gain("expression_gain", 1.0))
+            face = compose_face(self.affect, self._gain("expression_gain", 1.0))
+            if self.baseline is not None and self.baseline_weight > 0:
+                base = compose_face(self.baseline, self._gain("expression_gain", 1.0))
+                weight = self.baseline_weight
+                for key in face:
+                    face[key] = face[key] * (1.0 - weight) + base.get(key, 0.0) * weight
+            return face
+        if self.use_affect and self.baseline is not None and self.baseline_weight > 0:
+            # Idle with a mood: the baseline alone keeps the face off neutral.
+            return compose_face(
+                self.baseline,
+                self._gain("expression_gain", 1.0) * self.baseline_weight,
+            )
         if self.emotion.preset == "neutral" or self.emotion.preset_intensity < 0.08:
             # The model maps MouthSmile through MouthForm -1..1 and Brows
             # through -1..1 with an input floor of 0.15. Sending 0 made the
@@ -668,6 +688,19 @@ class PerformanceMixer:
         z += self._state_bias["z"] * self._speech_blend
         if self.use_affect and self.affect is not None:
             composed = compose_head(self.affect, self._gain("expression_head_gain", 1.0))
+            if self.baseline is not None and self.baseline_weight > 0:
+                base = compose_head(self.baseline, self._gain("expression_head_gain", 1.0))
+                weight = self.baseline_weight
+                for key in composed:
+                    composed[key] = composed[key] * (1.0 - weight) + base.get(key, 0.0) * weight
+            x += composed["yaw"]
+            y += composed["pitch"]
+            z += composed["roll"]
+        elif self.use_affect and self.baseline is not None and self.baseline_weight > 0:
+            composed = compose_head(
+                self.baseline,
+                self._gain("expression_head_gain", 1.0) * self.baseline_weight,
+            )
             x += composed["yaw"]
             y += composed["pitch"]
             z += composed["roll"]

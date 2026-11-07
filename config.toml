@@ -75,6 +75,9 @@ gesture_rate = 0.4
 idle_energy = 0.55
 # Expression strength mix: natural 70% / exaggerated 30% (user answer).
 exaggeration_share = 0.30
+# L2 mood baseline under the transient affect: 0 = off (old behavior).
+# 0.2-0.4 lets a lingering mood keep a faint presence on the face.
+baseline_weight = 0.0
 exaggeration_gain = 1.30
 blink_per_min = 14.0
 # auto | vowel | continuous | hybrid

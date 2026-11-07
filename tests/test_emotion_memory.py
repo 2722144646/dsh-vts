@@ -94,6 +94,9 @@ def test_empty_store_is_neutral(tmp_path):
 
 
 class _StubMixer:
+    def __init__(self):
+        self.baseline = None
+
     def set_affect(self, state):
         pass
 
@@ -102,6 +105,9 @@ class _StubMixer:
 
     def add_action(self, *args, **kwargs):
         pass
+
+    def set_baseline(self, state, weight):
+        self.baseline = (state, weight)
 
 
 def test_keyword_hit_does_not_claim_a_reason(tmp_path):
@@ -119,6 +125,22 @@ def test_keyword_hit_does_not_claim_a_reason(tmp_path):
     text = store.mood(now[0]).summary()
     assert "累" in text
     assert "为什么" not in text
+
+
+def test_engine_pushes_mood_to_baseline_when_enabled(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    config.avatar.baseline_weight = 0.3
+    engine = AvatarEngine(config)
+    engine.mixer = _StubMixer()
+    engine.feel({"sad": 0.8}, intensity=0.8, cause="他说你根本不在乎", why="被否定")
+    assert engine.mixer.baseline is not None
+    state, weight = engine.mixer.baseline
+    assert weight == pytest.approx(0.3)
+    assert state.labels.get("sad", 0.0) > 0
 
 
 def test_engine_explain_marks_latest_open(tmp_path):
