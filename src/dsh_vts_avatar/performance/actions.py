@@ -155,6 +155,16 @@ class ActionCue:
         if self.kind == "look_away":
             eyes = _hold(t, 0.12, 0.64)
             return {"gaze_x": 0.52 * eyes * amp, "gaze_y": 0.12 * eyes * amp}
+        if self.kind == "sigh":
+            # 松了口气：嘴微开像呼气，头轻轻下沉再回来 (2026-11-07 用户定 1.2s)
+            breathe = _hold(t, 0.10, 0.55)
+            sink = _hold(t, 0.16, 0.60)
+            return {
+                "open": 0.24 * breathe * amp,
+                "smile": 0.10 * breathe * amp,
+                "inner_brow": 0.08 * breathe * amp,
+                "pitch": 2.5 * sink * amp,
+            }
         return {}
 
     @classmethod
@@ -183,6 +193,7 @@ class ActionCue:
             "think_side": 1300,
             "look_away": 950,
             "emphasis": 340,
+            "sigh": 1200,
         }
         duration = duration_ms or durations.get(kind, 420)
         return cls(

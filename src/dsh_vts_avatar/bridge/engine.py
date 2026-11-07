@@ -867,6 +867,14 @@ class AvatarEngine:
                 turn_ref=turn_id,
             )
 
+        # 松了口气: play the sigh cue (round-ish mouth + a breath out + head sink).
+        top_label, top_weight = state.dominant()[0]
+        if self.mixer is not None and top_label == "relieved" and top_weight >= 0.5:
+            now = time.time()
+            if now - getattr(self, "_last_sigh", 0.0) > 10.0:
+                self.mixer.add_action("sigh", state.intensity)
+                self._last_sigh = now
+
         return {
             "ok": True,
             "mode": self.config.emotion.mode,
