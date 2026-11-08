@@ -297,14 +297,19 @@ class PerformanceMixer:
         actions = self._action_targets(int(sample))
         blink = self._blink.update(now)
 
-        if self._mouth_backend == "smile":
-            # Alternative mouth channel for models whose vowel params barely
-            # move: keep MouthOpen for the jaw and encode vowel width in
-            # MouthSmile (wide = smile up, round = smile down).
+        if self._mouth_backend == "hybrid":
+            # Both channels work: vowel params carry identity, MouthSmile adds
+            # a visible width change so wide/round vowels read at a distance.
             smile = clamp(
-                emotional["smile"] * 0.35
-                + speech["form"] * 0.85
+                emotional["smile"] * 0.55
+                + speech["form"] * 0.75
                 + actions.get("smile", 0.0),
+                -1.0,
+                1.0,
+            )
+        elif self._mouth_backend == "smile":
+            smile = clamp(
+                emotional["smile"] * 0.35 + speech["form"] * 0.85 + actions.get("smile", 0.0),
                 -1.0,
                 1.0,
             )

@@ -136,7 +136,7 @@ class AvatarEngine:
             self.config.avatar,
             self.tts.sample_rate,
             profile=self.profile,
-            backend=self.profile.choose_mouth_backend(self.config.avatar, "auto"),
+            backend=self._choose_backend(self.profile),
             use_affect=self.config.emotion.is_affect,
         )
         self.mixer.set_state("idle")
@@ -227,10 +227,37 @@ class AvatarEngine:
         if self.mixer is not None:
             self.mixer.set_profile(
                 self.profile,
-                self.profile.choose_mouth_backend(self.config.avatar, "auto"),
+                self._choose_backend(self.profile),
             )
         log.info("VTS ready: %s", self.profile.summary())
         return True
+
+    def _choose_backend(self, profile: Any) -> str:
+        """Pick the mouth channel that fits this model: vowel, smile, both, or open only."""
+        requested = (self.config.avatar.mouth_backend or "auto").lower()
+        if requested not in ("auto", ""):
+            return requested
+        try:
+            path = self.config.root / "data" / "mouth_strategy.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            model_id = str((data.get("model") or {}).get("modelID") or "")
+            strategy = str(data.get("strategy") or "").lower()
+        except Exception:
+            return profile.choose_mouth_backend(self.config.avatar, "auto")
+        if model_id and model_id != profile.model_id:
+            return profile.choose_mouth_backend(self.config.avatar, "auto")
+        voices = profile.voice_params(self.config.avatar)
+        has_voice = all(name in profile.input_params for name in voices)
+        has_smile = self.config.avatar.mouth_smile in profile.input_params
+        if strategy == "hybrid" and has_voice and has_smile:
+            return "hybrid"
+        if strategy == "smile" and has_smile:
+            return "smile"
+        if strategy == "vowel" and has_voice:
+            return "vowel"
+        if strategy == "continuous":
+            return "continuous"
+        return profile.choose_mouth_backend(self.config.avatar, "auto")
 
     async def _vts_connect_failed(self, exc: Exception) -> bool:
         self._last_error = str(exc)
@@ -329,7 +356,7 @@ class AvatarEngine:
             if self.mixer is not None:
                 self.mixer.set_profile(
                     profile,
-                    profile.choose_mouth_backend(self.config.avatar, "auto"),
+                    self._choose_backend(profile),
                 )
             await self._emit(
                 {

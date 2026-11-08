@@ -155,16 +155,15 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
             vowel_score = round(sum(vowels) / max(1, len(vowels)), 2)
             smile_score = round(by_name.get("MouthSmile", 0.0), 2)
             open_score = round(by_name.get("MouthOpen", 0.0), 2)
-            strategy = "smile" if smile_score > max(4.0 * vowel_score, 8.0) else "vowel"
-            mouth_strategy = {
-                "strategy": strategy,
-                "vowel_score": vowel_score,
-                "smile_score": smile_score,
-                "mouth_open_score": open_score,
-                "reason": "MouthSmile moves far more than the vowel params"
-                if strategy == "smile"
-                else "vowel params carry the mouth shape",
-            }
+            from dsh_vts_avatar.performance.mouth_strategy import classify
+
+            mouth_strategy = classify(vowel_score, smile_score, open_score)
+            strategy = mouth_strategy["strategy"]
+            mouth_strategy["reason"] = (
+                "vowel + smile both move: use both"
+                if strategy == "hybrid"
+                else "only one channel moves enough for lip shape"
+            )
             Path("data/mouth_strategy.json").write_text(
                 json.dumps({"model": model, **mouth_strategy}, ensure_ascii=False, indent=2),
                 encoding="utf-8",
