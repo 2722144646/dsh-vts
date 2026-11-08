@@ -28,6 +28,13 @@ import websockets
 
 VOWELS = "AIUEO"
 # vowel -> (voice width form -1..1, roundness 0..1, openness extra 0..1)
+SHAPE_MAP = {
+    "A": {"MouthOpen": 0.85, "MouthSmile": 0.10, "MouthX": 0.0},
+    "I": {"MouthOpen": 0.10, "MouthSmile": 0.80, "MouthX": 0.15},
+    "U": {"MouthOpen": 0.15, "MouthSmile": 0.05, "MouthX": -0.30},
+    "E": {"MouthOpen": 0.45, "MouthSmile": 0.55, "MouthX": 0.0},
+    "O": {"MouthOpen": 0.50, "MouthSmile": 0.10, "MouthX": 0.30},
+}
 SHAPE = {
     "A": (0.10, 0.10, 0.10),
     "I": (0.60, 0.00, 0.00),
@@ -45,6 +52,8 @@ def scheme_params(scheme: str, vowel: str) -> dict[str, float]:
         out[f"Voice{vowel}"] = 1.0
     if scheme in ("smile", "all"):
         out["MouthSmile"] = max(0.0, min(1.0, 0.45 + 0.45 * width))
+    if scheme in ("shape", "all"):
+        out.update(SHAPE_MAP[vowel])
     if scheme in ("vb", "all"):
         out["JawOpen"] = 0.15 + 0.25 * extra + 0.2 * roundness
         out["MouthFunnel"] = roundness * 0.8
@@ -129,7 +138,7 @@ async def run(out: pathlib.Path, url: str) -> dict[str, Any]:
     async with Bridge(url) as bridge:
         await bridge.call({"type": "inject.pause", "paused": True}, "inject.pause.result")
         try:
-            for scheme in ("vowel", "smile", "vb", "all"):
+            for scheme in ("vowel", "smile", "vb", "shape", "all"):
                 crops = {}
                 for vowel in VOWELS:
                     src = await bridge.hold(scheme_params(scheme, vowel))
