@@ -51,6 +51,12 @@ class Bridge:
             if reply.get("type") == expect and reply.get("request_id") == msg["request_id"]:
                 return reply
 
+    async def send(self, msg: dict[str, Any]) -> None:
+        self.seq += 1
+        msg = dict(msg)
+        msg["request_id"] = f"s{self.seq}"
+        await self.ws.send(json.dumps(msg))
+
     async def inject(self, params: dict[str, float]) -> None:
         await self.call({"type": "params.inject", "params": params}, "params.inject.result")
 
@@ -59,18 +65,22 @@ class Bridge:
         path = (reply.get("metrics") or {}).get("path")
         return pathlib.Path(path) if path else None
 
-    async def hold_snapshot(self, params: dict[str, float]) -> pathlib.Path | None:
+    async def hold_snapshot(self, params: dict[str, float], dst: pathlib.Path | None = None) -> pathlib.Path | None:
         """VTS keeps injected values only for the frame they arrive on, so keep
         re-sending while the NDI frame is grabbed."""
         async def pump() -> None:
             while True:
-                await self.inject(params)
+                await self.send({"type": "params.inject", "params": params})
                 await asyncio.sleep(0.03)
 
         task = asyncio.create_task(pump())
         try:
             await asyncio.sleep(0.35)
-            return await self.snapshot()
+            src = await self.snapshot()
+            if src and dst is not None and _jpeg_path(src):
+                shutil.copyfile(src, dst)
+                return dst
+            return src
         finally:
             task.cancel()
             try:
@@ -123,14 +133,11 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
                     continue
                 if not name or high == low:
                     continue
-                hi = await bridge.hold_snapshot({name: high})
-                lo = await bridge.hold_snapshot({name: low})
-                await bridge.inject({name: default})
                 f_hi = frames / f"{name}__max.jpg"
                 f_lo = frames / f"{name}__min.jpg"
-                for src, dst in ((hi, f_hi), (lo, f_lo)):
-                    if src and _jpeg_path(src):
-                        shutil.copyfile(src, dst)
+                await bridge.hold_snapshot({name: high}, f_hi)
+                await bridge.hold_snapshot({name: low}, f_lo)
+                await bridge.inject({name: default})
                 d = diff(load_gray(f_lo), load_gray(f_hi))
                 results.append(
                     {
