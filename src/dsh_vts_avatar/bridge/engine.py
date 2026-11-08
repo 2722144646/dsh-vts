@@ -452,7 +452,8 @@ class AvatarEngine:
         if self._queue is not None and self._queue.empty() and self.timeline is None:
             if self.mixer is not None:
                 self.mixer.set_state("idle")
-        self._maybe_write_diary()
+        # Diary is written by the model itself (vts_avatar_diary); the template
+        # fallback stays available but no longer runs automatically.
 
     def diary_write(self, text: str) -> dict[str, Any]:
         """Let the model write today's diary itself (better than a template)."""
@@ -856,6 +857,12 @@ class AvatarEngine:
                 diary_lines = []
         if diary_lines:
             text = (text + "\n" if text else "") + "（日记，过去几天）" + "；".join(diary_lines)
+        if diary is not None:
+            try:
+                if diary.due():
+                    text = (text + "\n" if text else "") + "（日记：今天还没写，记得用 vts_avatar_diary 写一篇，至少和昨天一样长）"
+            except Exception:
+                pass
         return {
             "ok": True,
             "text": text,
