@@ -776,11 +776,17 @@ class AvatarEngine:
         diary = getattr(self, "diary", None)
         if diary is not None:
             try:
-                for page in diary.recent(2):
-                    head = [line.strip("# ").strip() for line in page.strip().splitlines()[:3]]
-                    joined = " / ".join(part for part in head if part)
-                    if joined:
-                        diary_lines.append(joined[:160])
+                for page in diary.recent(1):
+                    lines: list[str] = []
+                    for raw in page.strip().splitlines():
+                        line = raw.strip()
+                        if not line or line.startswith("#") or line in ("日记",):
+                            continue
+                        lines.append(line.lstrip("- ").strip())
+                        if len(lines) >= 3:
+                            break
+                    if lines:
+                        diary_lines.append("；".join(lines)[:200])
             except Exception:
                 diary_lines = []
         if diary_lines:
