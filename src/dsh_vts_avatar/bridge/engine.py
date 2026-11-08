@@ -92,6 +92,7 @@ class AvatarEngine:
         self.diary = DiaryStore(config.root / "data")
         self.user_id = "default"
         self.display_name = "default"
+        self._last_voice_at = 0.0
         self.presence = PresenceDirector(
             base_energy=float(getattr(config.avatar, "idle_energy", 0.55)),
             library_path=str(config.root / "data" / "presence" / "idle_library.json"),
@@ -436,6 +437,7 @@ class AvatarEngine:
 
     async def begin_utterance(self, utterance_id: str | None = None) -> None:
         await self.cancel()
+        self._last_voice_at = time.perf_counter()
         self.utterance_id = utterance_id or f"utt-{int(time.time() * 1000)}"
         self.segmenter = Segmenter()
         self.speech_filter.reset()
@@ -448,6 +450,7 @@ class AvatarEngine:
     async def feed_text(self, text: str) -> None:
         if not text:
             return
+        self._last_voice_at = time.perf_counter()
         if self.mixer is not None:
             # Keywords can be split across deltas; evaluate a rolling window.
             # 2026-11-07: only the tool self-report drives affect now. Explicit
@@ -1200,7 +1203,10 @@ class AvatarEngine:
         if self.mixer.actions:
             return  # something is already playing; never stack idle cues
         self.presence.observe(self._presence_inputs())
-        cue = self.presence.next_cue(now, speaking=False)
+        silence = (
+            time.perf_counter() - self._last_voice_at if self._last_voice_at else 0.0
+        )
+        cue = self.presence.next_cue(now, speaking=False, silence_s=silence)
         if cue is None:
             return
         kind, intensity = cue
