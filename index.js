@@ -111,6 +111,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
+      } else if (message.type === 'transcript.window.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'local.chat.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -789,6 +796,25 @@ export function apply(ctx, config = {}) {
             user_id: String(args?.user_id ?? ''),
             display_name: String(args?.display_name ?? ''),
           });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_transcript_window',
+        description:
+          'Open the local chat transcript viewer (always-on-top window). It reads ' +
+          'data/chat/<user>.jsonl directly from disk; nothing in it goes through this conversation.',
+        parameters: { type: 'object', properties: {}, additionalProperties: false },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value?.ok ? `记录窗口已打开：${value?.file ?? ''}` : `打不开：${value?.error ?? ''}`,
+          }],
+        },
+        async execute() {
+          const result = await client.request('transcript.window', {});
           return { ...result, ok: result?.ok !== false };
         },
       }),
