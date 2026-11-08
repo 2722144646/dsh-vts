@@ -86,6 +86,9 @@ VTS 的 API 端口会自动探测（常见 8002 / 8003）；不需要手写端�
 
 默认**不加载**任何模型；显存占用为 0。
 
+- 后端可换：`[llm] backend = "ollama" | "openai" | "none"`；
+  `openai` 走任意 OpenAI 兼容的 `/v1/chat/completions`（LM Studio、llama.cpp server、vLLM、云端都行），
+  配 `endpoint` 与 `api_key`；`none` 关闭
 - 模型目录：`E:\ollama\models`（别放 C 盘）
 - 可用模型：`qwen3:8b`（导演候选）、`qwen2.5:7b`（回退）、
   `huihui_ai/qwen3-abliterated:8b`（私有对话）
