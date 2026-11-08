@@ -164,6 +164,18 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "idle.write":
+            actions = msg.get("actions") or []
+            if not isinstance(actions, list):
+                actions = []
+            result = self.engine.idle_write(
+                str(msg.get("profile") or ""), actions, str(msg.get("note") or "")
+            )
+            await ws.send(
+                orjson.dumps(
+                    {"type": "idle.write.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "user.switch":
             result = self.engine.switch_user(
                 str(msg.get("user_id") or ""), str(msg.get("display_name") or "")
