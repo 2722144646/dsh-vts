@@ -111,7 +111,7 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
-      } else if (message.type === 'transcript.window.result') {
+      } else if (message.type === 'transcript.window.result' || message.type === 'panel.open.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
           this.pending.delete(message.request_id);
@@ -796,6 +796,26 @@ export function apply(ctx, config = {}) {
             user_id: String(args?.user_id ?? ''),
             display_name: String(args?.display_name ?? ''),
           });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_panel',
+        description:
+          'Open the local settings panel: switch the LLM backend (ollama / openai-compatible / none), ' +
+          'edit endpoint, API key and models, toggle the idle director, test the connection. ' +
+          'Writes config.toml on this machine; restart the bridge to apply.',
+        parameters: { type: 'object', properties: {}, additionalProperties: false },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value?.ok ? `设置面板已打开：${value?.config ?? ''}（改完保存，重启桥接生效）` : `打不开：${value?.error ?? ''}`,
+          }],
+        },
+        async execute() {
+          const result = await client.request('panel.open', {});
           return { ...result, ok: result?.ok !== false };
         },
       }),
