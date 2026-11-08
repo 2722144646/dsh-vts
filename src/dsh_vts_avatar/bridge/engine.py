@@ -876,6 +876,9 @@ class AvatarEngine:
         now = time.time()
         mood = store.mood(now) if store is not None else Mood()
         text = mood.summary()
+        display = getattr(self, "display_name", "default")
+        if display and display != "default":
+            text = "（当前用户：" + str(display) + "）" + ("\n" + text if text else "")
         impression = ""
         relationship = getattr(self, "relationship", None)
         if relationship is not None:
