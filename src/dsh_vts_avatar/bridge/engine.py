@@ -1269,6 +1269,37 @@ class AvatarEngine:
             return {"ok": False, "error": str(exc)}
         return {"ok": True, "profile": profile, "actions": len(actions or [])}
 
+    def _director_context(self) -> dict[str, Any]:
+        """Everything the avatar already knows, in a compact form for the director."""
+        inputs = self._presence_inputs()
+        context: dict[str, Any] = {
+            "profile": self.presence.profile.key,
+            "mood": inputs.get("mood_labels") or {},
+            "mood_intensity": self.presence.profile.energy,
+            "trust": inputs.get("trust"),
+            "closeness": inputs.get("closeness"),
+            "friction": inputs.get("friction"),
+            "has_diary": inputs.get("has_diary"),
+            "baseline_weight": getattr(self.config.avatar, "baseline_weight", 0.4),
+            "recent": self.presence.recent(),
+        }
+        try:
+            rel = getattr(self, "relationship", None)
+            impression = rel.impression() if rel is not None else ""
+            if impression:
+                context["relation"] = str(impression)[:60]
+        except Exception:
+            pass
+        try:
+            diary = getattr(self, "diary", None)
+            if diary is not None:
+                recent = diary.recent(1)
+                if recent:
+                    context["diary"] = str(recent[0])[:80]
+        except Exception:
+            pass
+        return context
+
     async def _maybe_idle_cue(self, now: float) -> None:
         """Ask the presence director for the next idle motion, if any."""
         if self.mixer is None or self.mixer.state != "idle":
@@ -1296,14 +1327,8 @@ class AvatarEngine:
                     self.director.suggest(
                         kinds,
                         {
-                            "profile": self.presence.profile.key,
-                            "mood": self._presence_inputs().get("mood_labels"),
-                            "mood_intensity": self.presence.profile.energy,
-                            "trust": self._presence_inputs().get("trust"),
-                            "closeness": self._presence_inputs().get("closeness"),
-                            "friction": self._presence_inputs().get("friction"),
+                            **self._director_context(),
                             "silence_s": round(silence, 1),
-                            "recent": self.presence.recent(),
                         },
                     ),
                     timeout=self.config.llm.director_timeout_s + 1.0,
