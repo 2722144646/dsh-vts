@@ -246,6 +246,10 @@ class AvatarEngine:
         voices = profile.voice_params(self.config.avatar)
         has_voice = all(name in profile.input_params for name in voices)
         has_smile = self.config.avatar.mouth_smile in profile.input_params
+        has_open = self.config.avatar.mouth_open in profile.input_params
+        has_x = self.config.avatar.mouth_x in profile.input_params
+        if strategy == "shape" and has_open and has_smile:
+            return "shape"
         if strategy == "hybrid" and has_voice and has_smile:
             return "hybrid"
         if strategy == "smile" and has_smile:

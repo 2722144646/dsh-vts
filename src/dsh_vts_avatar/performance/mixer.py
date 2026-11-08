@@ -31,6 +31,8 @@ def clamp(value: float, low: float, high: float) -> float:
 # Diphthongs are one Piper segment, but the mouth should travel through both
 # targets instead of holding a single shape. Values are (start, end) vowel
 # phones; the shape crossfades over the second half of the segment.
+SHAPE_SMILE = {"A": 0.10, "I": 0.80, "U": 0.05, "E": 0.55, "O": 0.10}
+SHAPE_X = {"A": 0.0, "I": 0.15, "U": -0.30, "E": 0.0, "O": 0.30}
 DIPHTHONGS: dict[str, tuple[str, str]] = {
     "ai": ("a", "i"),
     "ei": ("e", "i"),
@@ -297,7 +299,14 @@ class PerformanceMixer:
         actions = self._action_targets(int(sample))
         blink = self._blink.update(now)
 
-        if self._mouth_backend == "hybrid":
+        if self._mouth_backend == "shape":
+            base = SHAPE_SMILE.get(segment.viseme or "", 0.45)
+            smile = clamp(
+                base + emotional["smile"] * 0.20 + actions.get("smile", 0.0) * 0.30,
+                -1.0,
+                1.0,
+            )
+        elif self._mouth_backend == "hybrid":
             # Both channels work: vowel params carry identity, MouthSmile adds
             # a visible width change so wide/round vowels read at a distance.
             smile = clamp(
@@ -383,7 +392,7 @@ class PerformanceMixer:
                 # lips instead of closing them, so do not drive it here.
                 jaw = 0.0
                 mouth_open = min(mouth_open, 0.035)
-        if self._mouth_backend in ("continuous", "hybrid", "smile"):
+        if self._mouth_backend in ("continuous", "hybrid", "smile", "shape"):
             params[a.mouth_open] = self._sv(
                 a.mouth_open,
                 mouth_open * mouth_gain,
@@ -431,6 +440,10 @@ class PerformanceMixer:
                 gate = 0.0 if (self.state == "speaking" or wants_mouth) else 1.0
                 params[a.voice_silence] = self._sv(a.voice_silence, gate, dt, 0.18, 0.45)
         params[a.mouth_smile] = self._sv(a.mouth_smile, smile, dt, 0.18, 0.55)
+        if self._mouth_backend == "shape" and self.profile is not None and self.profile.has(a.mouth_x):
+            params[a.mouth_x] = self._sv(
+                a.mouth_x, SHAPE_X.get(segment.viseme or "", 0.0), dt, 0.035, 0.090
+            )
         params[a.eye_left] = clamp(
             self._sv(a.eye_left, eye_base, dt, 0.07, 0.18) * blink, 0.0, 1.0
         )
