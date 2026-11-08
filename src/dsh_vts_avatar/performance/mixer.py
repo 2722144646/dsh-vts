@@ -796,9 +796,3 @@ def _energy(rms: float) -> float:
     floor_db = -45.0
     ceil_db = -12.0
     return clamp((db - floor_db) / (ceil_db - floor_db), 0.0, 1.0) ** 0.7
-
-
-def emotion_bias_from_text(text: str) -> tuple[str, float] | None:
-    from .emotion import emotion_from_text
-
-    return emotion_from_text(text)
