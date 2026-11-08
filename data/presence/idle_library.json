@@ -1,0 +1,35 @@
+{
+  "generated_at": 1794018344.883443,
+  "note": "开心的时候：小动作多，偶尔哼一下，愿意看向对方",
+  "profiles": {
+    "bright": {
+      "actions": [
+        {
+          "kind": "idle_tilt",
+          "weight": 2.5,
+          "intensity": 0.6
+        },
+        {
+          "kind": "idle_glance",
+          "weight": 2.0,
+          "intensity": 0.55
+        },
+        {
+          "kind": "idle_nod",
+          "weight": 1.5,
+          "intensity": 0.5
+        },
+        {
+          "kind": "idle_hum",
+          "weight": 1.5,
+          "intensity": 0.45
+        },
+        {
+          "kind": "idle_look_user",
+          "weight": 1.0,
+          "intensity": 0.45
+        }
+      ]
+    }
+  }
+}
