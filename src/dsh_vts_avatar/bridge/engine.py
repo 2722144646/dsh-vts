@@ -89,6 +89,27 @@ class AvatarEngine:
         self.relationship = RelationshipStore(config.root / "data")
         self.privacy = PrivacyStore(config.root / "data")
         self.diary = DiaryStore(config.root / "data")
+        self.user_id = "default"
+        self.display_name = "default"
+
+    def switch_user(self, user_id: str, display_name: str = "") -> dict[str, Any]:
+        """Switch the active person; every L2/L3 store follows."""
+        cleaned = "".join(ch for ch in str(user_id or "") if ch.isalnum() or ch in "-_")
+        if not cleaned:
+            return {"ok": False, "error": "user_id required"}
+        self.user_id = cleaned
+        self.display_name = (display_name or cleaned).strip()[:40] or cleaned
+        data = self.config.root / "data"
+        episode_path = (
+            data / "emotion" / "episodes.jsonl"
+            if cleaned == "default"
+            else data / "emotion" / f"{cleaned}.jsonl"
+        )
+        self.episode_store = EpisodeStore(episode_path)
+        self.relationship = RelationshipStore(data, cleaned)
+        self.privacy = PrivacyStore(data, cleaned)
+        self.diary = DiaryStore(data, cleaned)
+        return {"ok": True, "user_id": cleaned, "display_name": self.display_name}
 
     # -- lifecycle ---------------------------------------------------------
 

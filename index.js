@@ -111,6 +111,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
+      } else if (message.type === 'user.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'relationship.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -736,6 +743,37 @@ export function apply(ctx, config = {}) {
           const result = await client.request('relationship.event', {
             event: String(args?.event ?? ''),
             note: String(args?.note ?? ''),
+          });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_switch_user',
+        description:
+          'Switch the person you are talking to. Each user keeps their own emotion episodes, ' +
+          'relationship, private items and diary. Call it when a different person takes over ' +
+          'the conversation; display_name is optional.',
+        parameters: {
+          type: 'object',
+          properties: {
+            user_id: { type: 'string', description: 'Stable id, letters/digits/-/_' },
+            display_name: { type: 'string' },
+          },
+          required: ['user_id'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value?.ok ? `已切换到 ${value?.display_name ?? value?.user_id}` : `切换失败：${value?.error ?? ''}`,
+          }],
+        },
+        async execute(args) {
+          const result = await client.request('user.switch', {
+            user_id: String(args?.user_id ?? ''),
+            display_name: String(args?.display_name ?? ''),
           });
           return { ...result, ok: result?.ok !== false };
         },
