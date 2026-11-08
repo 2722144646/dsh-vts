@@ -280,6 +280,10 @@ class AudioEngine:
         )
         return delay_ms
 
+    def has_fresh_latency(self) -> bool:
+        """True when a usable cached latency exists, so calibration can be skipped."""
+        return self._read_cached_latency() is not None
+
     @staticmethod
     def _latency_cache_path() -> Path:
         return Path(__file__).resolve().parents[3] / "data" / "audio_latency.json"

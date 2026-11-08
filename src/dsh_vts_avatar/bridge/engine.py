@@ -145,7 +145,13 @@ class AvatarEngine:
         await self._connect_vts()
         self._watcher = asyncio.create_task(self._vts_watchdog(), name="avatar-vts-startup-check")
         if self.config.audio.auto_calibrate and hasattr(self.clock, "calibrate_output_latency"):
-            await asyncio.to_thread(self.clock.calibrate_output_latency)
+            # Only measure when there is no usable cache. Re-running this on
+            # every start plays three quiet clicks, which is audible and is not
+            # worth it while the endpoint has not changed.
+            if not self.clock.has_fresh_latency():
+                await asyncio.to_thread(self.clock.calibrate_output_latency)
+            else:
+                log.info("audio latency cache is fresh; skipping calibration")
         self._open_ndi()
         self._ticker = asyncio.create_task(self._tick_loop(), name="avatar-tick")
         await self._emit(

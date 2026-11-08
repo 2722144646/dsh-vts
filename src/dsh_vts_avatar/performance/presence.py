@@ -45,7 +45,6 @@ KNOWN_IDLE_KINDS = set().union(*(set(pool) for pool in POOLS.values())) | MOUTH_
     "idle_look_user",
 }
 
-COOLDOWN_S = 3.0
 MIN_GAP = 6.0
 MAX_GAP = 12.0
 BATCH_TTL_S = 24 * 3600.0
