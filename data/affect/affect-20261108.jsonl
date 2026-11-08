@@ -1,2 +1,4 @@
 {"t":1794101537.1227806,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794101537.1227136}
 {"t":1794101537.1249917,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794101537.1227658,"applied":true}
+{"t":1794106395.7598765,"kind":"evidence","source":"tool","labels":{"happy":1.0},"intensity":0.8,"confidence":0.9,"note":"","turn_id":"","timestamp":1794106395.7598042}
+{"t":1794106395.763264,"kind":"state","labels":{"happy":1.0},"intensity":0.8,"confidence":0.9,"valence":0.75,"arousal":0.55,"hold_until":0.0,"source":"fusion","updated_at":1794106395.7598615,"applied":true}

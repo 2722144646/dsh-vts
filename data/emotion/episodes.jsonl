@@ -1,0 +1,1 @@
+{"what": "S4 演示：今天心情不错", "why": "", "appraisal": [], "labels": {"happy": 1.0}, "intensity": 0.8, "confidence": 0.9, "salience": 0.8, "status": "open", "acceptance": 0.0, "explanation": null, "defense": null, "source": "tool", "user_id": "default", "turn_ref": "", "started_at": 1794106395.775098, "updated_at": 1794106395.775098, "id": "ep-4be5c1034a85", "schema_version": 2}
