@@ -288,6 +288,16 @@ class AudioEngine:
             data = json.loads(self._latency_cache_path().read_text(encoding="utf-8"))
             value = float(data.get("latency_ms"))
             if 15.0 <= value <= 500.0:
+                driver_ms = 0.0
+                if self._stream is not None:
+                    driver_ms = float(getattr(self._stream, "latency", 0.0)) * 1000.0
+                if driver_ms > 0 and abs(value - driver_ms) > 150.0:
+                    self.log.warning(
+                        "cached latency %.1fms disagrees with driver (%.1fms); ignoring cache",
+                        value,
+                        driver_ms,
+                    )
+                    return None
                 return value
         except Exception:
             pass
