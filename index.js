@@ -111,6 +111,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
+      } else if (message.type === 'local.chat.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'idle.write.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -781,6 +788,37 @@ export function apply(ctx, config = {}) {
           const result = await client.request('user.switch', {
             user_id: String(args?.user_id ?? ''),
             display_name: String(args?.display_name ?? ''),
+          });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_local_say',
+        description:
+          'Hand one reply to her own local model (Ollama on this machine). The local model ' +
+          'writes and speaks the line; the text never reaches this conversation. Use it when ' +
+          'the topic is one the host cannot write. Returns only how many characters she spoke.',
+        parameters: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', description: 'What the person just said, verbatim.' },
+          },
+          required: ['text'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value?.ok
+              ? `她用本地模型说完了（${value?.chars ?? 0} 字）`
+              : `没说出来：${value?.error ?? ''}`,
+          }],
+        },
+        async execute(args) {
+          const result = await client.request('local.chat', {
+            text: String(args?.text ?? ''),
           });
           return { ...result, ok: result?.ok !== false };
         },

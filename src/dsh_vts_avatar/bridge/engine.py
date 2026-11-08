@@ -7,6 +7,7 @@ import logging
 import math
 import random
 import time
+from collections import deque
 from pathlib import Path
 from dataclasses import replace
 from typing import Any, Awaitable, Callable
@@ -24,6 +25,7 @@ from ..performance.privacy import PrivacyStore
 from ..performance.diary import DiaryStore
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.presence import MOUTH_KINDS, PresenceDirector, idle_mouth_allowed
+from .local_chat import LocalChat
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
 from ..tts.distill import DistilledPiperTTS
@@ -97,6 +99,8 @@ class AvatarEngine:
             base_energy=float(getattr(config.avatar, "idle_energy", 0.55)),
             library_path=str(config.root / "data" / "presence" / "idle_library.json"),
         )
+        self.local_chat = LocalChat(config.llm)
+        self._chat_history: dict[str, deque] = {}
 
     def switch_user(self, user_id: str, display_name: str = "") -> dict[str, Any]:
         """Switch the active person; every L2/L3 store follows."""
@@ -1186,6 +1190,38 @@ class AvatarEngine:
             "dependency": float(getattr(state, "dependency", 0.0) or 0.0),
             "has_diary": has_diary,
         }
+
+    async def local_reply(self, user_text: str) -> dict[str, Any]:
+        """Answer through the local model and speak it; never return the text."""
+        cfg = self.config.llm
+        if not cfg.enabled:
+            return {"ok": False, "error": "local chat disabled"}
+        text_in = (user_text or "").strip()
+        if not text_in:
+            return {"ok": False, "error": "text required"}
+        history = self._chat_history.setdefault(
+            self.user_id, deque(maxlen=max(4, int(cfg.history_turns) * 2))
+        )
+        extra = ""
+        try:
+            extra = self.mood_payload().get("text") or ""
+        except Exception:
+            extra = ""
+        try:
+            reply = await self.local_chat.reply(text_in, list(history), extra_system=extra)
+        except Exception as exc:
+            return {"ok": False, "error": f"llm: {exc}"}
+        if not reply:
+            return {"ok": False, "error": "empty reply"}
+        history.append({"role": "user", "content": text_in})
+        history.append({"role": "assistant", "content": reply})
+        try:
+            await self.begin_utterance()
+            await self.feed_text(reply)
+            await self.end_utterance()
+        except Exception as exc:
+            return {"ok": False, "error": f"tts: {exc}", "chars": len(reply)}
+        return {"ok": True, "chars": len(reply), "model": cfg.model}
 
     def idle_write(self, profile: str, actions: list, note: str = "") -> dict[str, Any]:
         """Store a model-written idle batch (tool path)."""

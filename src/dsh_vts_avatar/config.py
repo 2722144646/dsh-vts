@@ -152,6 +152,18 @@ class EmotionConfig:
 
 
 @dataclass(slots=True)
+class LLMConfig:
+    """Local Ollama model used for the private (uncensored) speech path."""
+
+    enabled: bool = False
+    endpoint: str = "http://127.0.0.1:11434"
+    model: str = "qwen3-8b-abliterated"
+    timeout_s: float = 180.0
+    history_turns: int = 8
+    persona: str = ""
+
+
+@dataclass(slots=True)
 class Config:
     root: Path
     vts: VTSConfig = field(default_factory=VTSConfig)
@@ -162,6 +174,7 @@ class Config:
     ndi: NDIConfig = field(default_factory=NDIConfig)
     bridge: BridgeConfig = field(default_factory=BridgeConfig)
     emotion: EmotionConfig = field(default_factory=EmotionConfig)
+    llm: LLMConfig = field(default_factory=LLMConfig)
 
     def resolve(self, path: Path | None) -> Path | None:
         if path is None:
@@ -226,6 +239,7 @@ def load_config(path: str | Path | None = None) -> Config:
     bridge_raw = _section(raw, "bridge")
     rvc_raw = _section(raw, "rvc")
     emotion_raw = _section(raw, "emotion")
+    llm_raw = _section(raw, "llm")
 
     cfg = Config(root=root)
     cfg.vts = VTSConfig(
@@ -328,6 +342,14 @@ def load_config(path: str | Path | None = None) -> Config:
     if mode not in EmotionConfig.VALID_MODES:
         mode = "legacy"
     cfg.emotion = EmotionConfig(mode=mode)
+    cfg.llm = LLMConfig(
+        enabled=bool(llm_raw.get("enabled", False)),
+        endpoint=str(llm_raw.get("endpoint", "http://127.0.0.1:11434")),
+        model=str(llm_raw.get("model", "qwen3-8b-abliterated")),
+        timeout_s=float(llm_raw.get("timeout_s", 180.0)),
+        history_turns=int(llm_raw.get("history_turns", 8)),
+        persona=str(llm_raw.get("persona", "")),
+    )
     # Resolve every filesystem path once, against the config directory. This
     # keeps the bridge independent of the process current working directory.
     cfg.vts.token_path = cfg.resolve(cfg.vts.token_path)  # type: ignore[assignment]
