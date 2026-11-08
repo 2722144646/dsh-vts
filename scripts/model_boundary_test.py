@@ -59,6 +59,25 @@ class Bridge:
         path = (reply.get("metrics") or {}).get("path")
         return pathlib.Path(path) if path else None
 
+    async def hold_snapshot(self, params: dict[str, float]) -> pathlib.Path | None:
+        """VTS keeps injected values only for the frame they arrive on, so keep
+        re-sending while the NDI frame is grabbed."""
+        async def pump() -> None:
+            while True:
+                await self.inject(params)
+                await asyncio.sleep(0.03)
+
+        task = asyncio.create_task(pump())
+        try:
+            await asyncio.sleep(0.35)
+            return await self.snapshot()
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
 
 def diff(gray_a, gray_b) -> float:
     import cv2
@@ -104,12 +123,8 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
                     continue
                 if not name or high == low:
                     continue
-                await bridge.inject({name: high})
-                await asyncio.sleep(0.15)
-                hi = await bridge.snapshot()
-                await bridge.inject({name: low})
-                await asyncio.sleep(0.15)
-                lo = await bridge.snapshot()
+                hi = await bridge.hold_snapshot({name: high})
+                lo = await bridge.hold_snapshot({name: low})
                 await bridge.inject({name: default})
                 f_hi = frames / f"{name}__max.jpg"
                 f_lo = frames / f"{name}__min.jpg"
