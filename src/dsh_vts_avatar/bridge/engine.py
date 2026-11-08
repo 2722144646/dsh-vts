@@ -26,7 +26,7 @@ from ..performance.privacy import PrivacyStore
 from ..performance.diary import DiaryStore
 from ..performance.mouth_monitor import MouthMonitor
 from ..performance.presence import MOUTH_KINDS, PresenceDirector, idle_mouth_allowed
-from .local_chat import LocalChat
+from .local_chat import LocalChat, LocalDirector
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
 from ..tts.distill import DistilledPiperTTS
@@ -101,6 +101,7 @@ class AvatarEngine:
             library_path=str(config.root / "data" / "presence" / "idle_library.json"),
         )
         self.local_chat = LocalChat(config.llm)
+        self.director = LocalDirector(config.llm) if config.llm.director_enabled else None
         self._chat_history: dict[str, deque] = {}
 
     def switch_user(self, user_id: str, display_name: str = "") -> dict[str, Any]:
@@ -1268,7 +1269,7 @@ class AvatarEngine:
             return {"ok": False, "error": str(exc)}
         return {"ok": True, "profile": profile, "actions": len(actions or [])}
 
-    def _maybe_idle_cue(self, now: float) -> None:
+    async def _maybe_idle_cue(self, now: float) -> None:
         """Ask the presence director for the next idle motion, if any."""
         if self.mixer is None or self.mixer.state != "idle":
             return
@@ -1279,13 +1280,41 @@ class AvatarEngine:
         silence = (
             time.perf_counter() - self._last_voice_at if self._last_voice_at else 0.0
         )
-        cue = self.presence.next_cue(now, speaking=False, silence_s=silence)
-        if cue is None:
+        rule = self.presence.next_cue(now, speaking=False, silence_s=silence)
+        if rule is None:
             return
-        kind, intensity = cue
-        if kind in MOUTH_KINDS and not idle_mouth_allowed(
-            self.mixer.state, self.timeline is not None
-        ):
+        kind, intensity = rule
+        mouth_ok = idle_mouth_allowed(self.mixer.state, self.timeline is not None)
+        if self.director is not None:
+            kinds = [
+                name
+                for name in self.presence.pool_kinds()
+                if name not in MOUTH_KINDS or mouth_ok
+            ]
+            try:
+                suggestion = await asyncio.wait_for(
+                    self.director.suggest(
+                        kinds,
+                        {
+                            "profile": self.presence.profile.key,
+                            "mood": self._presence_inputs().get("mood_labels"),
+                            "mood_intensity": self.presence.profile.energy,
+                            "trust": self._presence_inputs().get("trust"),
+                            "closeness": self._presence_inputs().get("closeness"),
+                            "friction": self._presence_inputs().get("friction"),
+                            "silence_s": round(silence, 1),
+                            "recent": self.presence.recent(),
+                        },
+                    ),
+                    timeout=self.config.llm.director_timeout_s + 1.0,
+                )
+            except Exception:
+                suggestion = None
+            if suggestion is not None:
+                kind, intensity = suggestion
+                self.presence.note(kind)
+                log.info("director picked: %s (%.2f)", kind, intensity)
+        if kind in MOUTH_KINDS and not mouth_ok:
             return
         self.mixer.add_action(kind, intensity)
         log.info(
@@ -1346,7 +1375,7 @@ class AvatarEngine:
                     log.warning("VTS injection error: %s", err)
                 if self._should_idle(sample):
                     self.mixer.set_state("idle")
-                self._maybe_idle_cue(now)
+                await self._maybe_idle_cue(now)
                 if now - self._last_emit >= 0.10:
                     self._last_emit = now
                     await self._emit(

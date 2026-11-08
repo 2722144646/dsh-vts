@@ -161,6 +161,9 @@ class LLMConfig:
     timeout_s: float = 180.0
     history_turns: int = 8
     persona: str = ""
+    director_enabled: bool = False
+    director_model: str = "qwen3:8b"
+    director_timeout_s: float = 8.0
 
 
 @dataclass(slots=True)
@@ -349,6 +352,9 @@ def load_config(path: str | Path | None = None) -> Config:
         timeout_s=float(llm_raw.get("timeout_s", 180.0)),
         history_turns=int(llm_raw.get("history_turns", 8)),
         persona=str(llm_raw.get("persona", "")),
+        director_enabled=bool(llm_raw.get("director_enabled", False)),
+        director_model=str(llm_raw.get("director_model", "qwen3:8b")),
+        director_timeout_s=float(llm_raw.get("director_timeout_s", 8.0)),
     )
     # Resolve every filesystem path once, against the config directory. This
     # keeps the bridge independent of the process current working directory.

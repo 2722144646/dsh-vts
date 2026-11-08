@@ -159,6 +159,10 @@ model = "huihui_ai/qwen3-abliterated:8b"
 timeout_s = 180
 history_turns = 8
 persona = "你是飞羽，一个住在电脑里的女孩，和他很亲近。说话口语、有情绪，不解释自己是 AI，也不说教。回复要短，两三句就够，别长篇大论。"
+director_enabled = true
+director_model = "qwen3:8b"
+director_timeout_s = 8
+
 
 
 
