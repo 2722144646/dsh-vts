@@ -64,3 +64,15 @@ def test_diary_cap_drops_oldest(tmp_path):
     files = list(store.root.glob("*.md"))
     assert len(files) == 1
     assert files[0].read_text(encoding="utf-8").startswith("b")
+
+def test_mood_payload_includes_recent_diary(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    engine = AvatarEngine(config)
+    engine.diary.write("# 日记\n- 他说你根本不在乎", now=1000.0)
+    payload = engine.mood_payload()
+    assert payload["diary"]
+    assert "不在乎" in payload["text"]
