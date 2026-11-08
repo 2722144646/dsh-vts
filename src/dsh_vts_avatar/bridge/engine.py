@@ -1053,17 +1053,6 @@ class AvatarEngine:
                 self._last_sample = sample
                 params = self.mixer.compute(sample, self.timeline, now)
                 self._last_params = params
-                # TEMP (2026-11-07): log the params an action actually injects.
-                if params and getattr(self.mixer, "actions", None):
-                    cue = self.mixer.actions[0]
-                    log.info(
-                        "action params mouth=%s head_y=%s cue.start=%s sample=%s finished=%s",
-                        round(params.get(self.mixer.avatar.mouth_open, -1.0), 3),
-                        round(params.get(self.mixer.avatar.head_y, -1.0), 3),
-                        getattr(cue, "start", None),
-                        sample,
-                        getattr(cue, "finished", None),
-                    )
                 if self.timeline is not None:
                     mouth_segment = self.timeline.at(sample)
                     audible = self.timeline.rms_at(sample) > 0.01 or (
