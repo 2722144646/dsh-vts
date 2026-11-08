@@ -185,13 +185,6 @@ class BridgeServer:
                     {"type": "hotkey.trigger.result", "request_id": msg.get("request_id"), "data": result}
                 ).decode("utf-8")
             )
-        elif mtype == "baseline.set":
-            result = self.engine.set_baseline_weight(float(msg.get("weight", 0.0)))
-            await ws.send(
-                orjson.dumps(
-                    {"type": "baseline.result", "request_id": msg.get("request_id"), **result}
-                ).decode("utf-8")
-            )
         elif mtype == "diary.write":
             result = self.engine.diary_write(str(msg.get("text") or ""))
             await ws.send(

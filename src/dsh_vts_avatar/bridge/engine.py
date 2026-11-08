@@ -455,13 +455,6 @@ class AvatarEngine:
         # Diary is written by the model itself (vts_avatar_diary); the template
         # fallback stays available but no longer runs automatically.
 
-    def set_baseline_weight(self, weight: float) -> dict[str, Any]:
-        """Live adjust the mood baseline weight (for observing the effect)."""
-        value = max(0.0, min(0.6, float(weight)))
-        self.config.avatar.baseline_weight = value
-        self._refresh_baseline()
-        return {"ok": True, "weight": value}
-
     def diary_write(self, text: str) -> dict[str, Any]:
         """Let the model write today's diary itself (better than a template)."""
         diary = getattr(self, "diary", None)

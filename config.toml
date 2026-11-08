@@ -77,7 +77,7 @@ idle_energy = 0.55
 exaggeration_share = 0.30
 # L2 mood baseline under the transient affect: 0 = off (old behavior).
 # 0.2-0.4 lets a lingering mood keep a faint presence on the face.
-baseline_weight = 0.15
+baseline_weight = 0.40
 exaggeration_gain = 1.30
 blink_per_min = 14.0
 # auto | vowel | continuous | hybrid
