@@ -164,6 +164,13 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "local.chat":
+            result = await self.engine.local_reply(str(msg.get("text") or ""))
+            await ws.send(
+                orjson.dumps(
+                    {"type": "local.chat.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "idle.write":
             actions = msg.get("actions") or []
             if not isinstance(actions, list):

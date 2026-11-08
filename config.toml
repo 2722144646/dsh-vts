@@ -149,3 +149,14 @@ port = 8765
 
 
 
+
+[llm]
+# Local Ollama model for the private speech path. The avatar's reply is
+# generated locally and spoken directly; the text never leaves this machine.
+enabled = true
+endpoint = "http://127.0.0.1:11434"
+model = "huihui_ai/qwen3-abliterated:8b"
+timeout_s = 180
+history_turns = 8
+persona = "你是飞羽，一个住在电脑里的女孩，和他很亲近。说话口语、简短、有情绪，不解释自己是 AI，也不说教。"
+
