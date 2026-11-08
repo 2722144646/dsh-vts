@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import math
 import random
@@ -1221,7 +1222,23 @@ class AvatarEngine:
             await self.end_utterance()
         except Exception as exc:
             return {"ok": False, "error": f"tts: {exc}", "chars": len(reply)}
+        self._log_local_turn(text_in, reply)
         return {"ok": True, "chars": len(reply), "model": cfg.model}
+
+    def _log_local_turn(self, user_text: str, reply: str) -> None:
+        """Keep the raw transcript on disk; it is never sent through the host."""
+        try:
+            path = self.config.root / "data" / "chat" / f"{self.user_id}.jsonl"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            record = {
+                "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "user": user_text,
+                "assistant": reply,
+            }
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            log.debug("local transcript write failed: %s", exc)
 
     def idle_write(self, profile: str, actions: list, note: str = "") -> dict[str, Any]:
         """Store a model-written idle batch (tool path)."""

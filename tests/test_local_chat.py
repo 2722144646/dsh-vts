@@ -52,3 +52,31 @@ def test_local_reply_disabled(tmp_path):
     result = asyncio.run(engine.local_reply("hi"))
     assert result["ok"] is False
     assert "disabled" in result["error"]
+
+def test_local_reply_writes_raw_transcript(tmp_path):
+    import json
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    config.llm = LLMConfig(enabled=True, history_turns=2)
+    engine = AvatarEngine(config)
+    engine.local_chat = StubLocal()
+
+    async def begin():
+        return None
+
+    async def feed(text):
+        return None
+
+    async def end():
+        return None
+
+    engine.begin_utterance = begin
+    engine.feed_text = feed
+    engine.end_utterance = end
+    asyncio.run(engine.local_reply("测试一句"))
+    path = tmp_path / "data" / "chat" / "default.jsonl"
+    assert path.exists()
+    row = json.loads(path.read_text(encoding="utf-8").strip().splitlines()[-1])
+    assert row["user"] == "测试一句"
+    assert row["assistant"] == "嗯，我在听。"
