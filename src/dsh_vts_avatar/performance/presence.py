@@ -73,6 +73,9 @@ class PresenceDirector:
 
         tension = max(friction, 0.0) * 0.7 + sad * 0.35 + doubt * 0.15
         warmth = closeness * 0.5 + trust * 0.35 + bright * 0.25 - tension * 0.3
+        if inputs.get("has_diary"):
+            # Having shared days behind her warms the idle behaviour a little.
+            warmth += 0.05
         energy = self.base_energy * (0.75 + 0.5 * max(intensity, 0.15))
         mouth = 0.15 + bright * 0.4 + max(sad - 0.4, 0.0) * 0.3
 
@@ -104,18 +107,21 @@ class PresenceDirector:
 
     def observe(self, inputs: dict) -> PresenceProfile:
         """Update the profile; the pool switches only when the bucket does."""
+        previous = self.profile.key
         self.profile = self._bucket(inputs)
+        if self.profile.key != previous:
+            # A threshold was crossed: let the new pool take over promptly.
+            self._next_at = 0.0
         return self.profile
 
     def _pick(self, now: float) -> tuple[str, float] | None:
         pool = POOLS.get(self.profile.key, POOLS["calm"])
+        # Mouth kinds are excluded entirely when the mouth appetite is low.
         candidates = {
             kind: weight
             for kind, weight in pool.items()
-            if kind in MOUTH_KINDS and self.profile.mouth < 0.2
+            if kind not in MOUTH_KINDS or self.profile.mouth >= 0.2
         }
-        # Mouth kinds are gated by the mouth appetite; if that leaves nothing,
-        # fall back to the full pool minus mouth kinds.
         if not candidates:
             candidates = {
                 kind: weight
