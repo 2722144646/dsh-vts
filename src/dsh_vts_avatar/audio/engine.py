@@ -272,10 +272,11 @@ class AudioEngine:
         self._latency_samples = int(delay_ms * self.sample_rate / 1000.0)
         self._write_cached_latency(delay_ms)
         self.log.info(
-            "auto latency calibration: %.1fms (median of %d + %.1fms correction, replaces driver estimate)",
+            "auto latency calibration: %.1fms (median of %d + %.1fms correction, click volume %.2f, replaces driver estimate)",
             delay_ms,
             len(delays),
             self.config.sync_correction_ms,
+            self.config.calibration_volume,
         )
         return delay_ms
 
