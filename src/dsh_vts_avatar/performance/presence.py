@@ -1,26 +1,36 @@
 """Presence director: what she does when nobody is talking.
 
 Idle behaviour is not random animation — it is chosen from how she feels
-(mood), how close the relationship is, and what the diary says. The director
-re-plans only when the inputs cross a threshold, so a quiet evening does not
-flicker between "bright" and "low" every few seconds.
+(mood), how close the relationship is, and what the diary says. The action
+batches themselves are written by the model: when a threshold is crossed (or
+after 24 hours without a new batch), the director asks for a fresh batch.
 
-The caller (engine tick) passes a small ``inputs`` dict; the director returns
-an idle cue kind (from ``actions.ACTION_KINDS``) or ``None``.
+Library file: ``data/presence/idle_library.json``::
+
+    {
+      "generated_at": 1760000000.0,
+      "note": "…",
+      "profiles": {
+        "bright": {"actions": [{"kind": "idle_tilt", "weight": 2.0, "intensity": 0.6}]}
+      }
+    }
 """
 
 from __future__ import annotations
 
+import json
 import random
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 
 # Kinds whose animation touches mouth parameters. They are allowed at idle but
 # must yield immediately when speech starts.
 MOUTH_KINDS = {"idle_sigh", "idle_hum", "idle_yawn"}
 
-# Weighted pools per profile. Keys must exist in actions.py.
+# Default pools per profile; also defines the set of legal idle kinds.
 POOLS: dict[str, dict[str, float]] = {
     "calm": {"idle_glance": 3.0, "idle_tilt": 2.0, "idle_nod": 1.0, "idle_breathe": 2.0},
     "cozy": {"idle_look_user": 3.0, "idle_tilt": 2.0, "idle_sigh": 1.0, "idle_hum": 1.0},
@@ -29,9 +39,16 @@ POOLS: dict[str, dict[str, float]] = {
     "tense": {"idle_look_away": 3.0, "idle_breathe": 2.0, "idle_tilt": 1.0, "idle_nod": 0.5},
 }
 
+KNOWN_IDLE_KINDS = set().union(*(set(pool) for pool in POOLS.values())) | MOUTH_KINDS | {
+    "idle_look_down",
+    "idle_look_away",
+    "idle_look_user",
+}
+
 COOLDOWN_S = 3.0
 MIN_GAP = 6.0
 MAX_GAP = 12.0
+BATCH_TTL_S = 24 * 3600.0
 
 
 @dataclass
@@ -46,13 +63,118 @@ class PresenceProfile:
 
 @dataclass
 class PresenceDirector:
-    """Chooses idle cues from mood + relationship + diary."""
+    """Chooses idle cues from mood + relationship + diary, using model batches."""
 
     base_energy: float = 0.55
     rng: random.Random = field(default_factory=random.Random)
+    library_path: str = ""
     profile: PresenceProfile = field(default_factory=PresenceProfile)
+    library: dict[str, dict[str, dict[str, float]]] = field(default_factory=dict)
+    generated_at: float = 0.0
+    needs_write: bool = True
+    write_reason: str = "never"
+    library_note: str = ""
     _next_at: float = 0.0
     _last: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self._load()
+
+    # -- library ----------------------------------------------------------
+
+    def _load(self) -> None:
+        if not self.library_path:
+            return
+        try:
+            raw = json.loads(Path(self.library_path).read_text(encoding="utf-8"))
+        except Exception:
+            return
+        self.generated_at = float(raw.get("generated_at") or 0.0)
+        self.library_note = str(raw.get("note") or "")
+        library: dict[str, dict[str, dict[str, float]]] = {}
+        for key, entry in (raw.get("profiles") or {}).items():
+            actions = {}
+            for item in (entry or {}).get("actions") or []:
+                kind = str(item.get("kind") or "")
+                if kind not in KNOWN_IDLE_KINDS:
+                    continue
+                weight = float(item.get("weight", 1.0))
+                if weight <= 0:
+                    continue
+                actions[kind] = {
+                    "w": min(5.0, max(0.1, weight)),
+                    "i": min(1.2, max(0.1, float(item.get("intensity", 0.6)))),
+                }
+            if actions:
+                library[str(key)] = actions
+        self.library = library
+        if self.library:
+            self.needs_write = False
+            self.write_reason = ""
+
+    def save_batch(self, profile: str, actions: list[dict[str, Any]], note: str = "") -> dict[str, Any]:
+        """Store a model-written batch for one profile and clear the refresh flag."""
+        profile = str(profile or "").strip().lower()
+        if profile not in POOLS:
+            raise ValueError(f"unknown profile: {profile}")
+        cleaned: dict[str, dict[str, float]] = {}
+        for item in actions or []:
+            kind = str(item.get("kind") or "")
+            if kind not in KNOWN_IDLE_KINDS:
+                raise ValueError(f"unknown idle action: {kind}")
+            weight = float(item.get("weight", 1.0))
+            if weight <= 0:
+                continue
+            cleaned[kind] = {
+                "w": min(5.0, max(0.1, weight)),
+                "i": min(1.2, max(0.1, float(item.get("intensity", 0.6)))),
+            }
+        if not cleaned:
+            raise ValueError("empty batch")
+        self.library[profile] = cleaned
+        self.generated_at = time.time()
+        self.needs_write = False
+        self.write_reason = ""
+        self.library_note = str(note or "")[:200]
+        self._save()
+        return {
+            "ok": True,
+            "profile": profile,
+            "actions": len(cleaned),
+            "generated_at": self.generated_at,
+        }
+
+    def _save(self) -> None:
+        if not self.library_path:
+            return
+        path = Path(self.library_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "generated_at": self.generated_at,
+            "note": self.library_note,
+            "profiles": {
+                key: {
+                    "actions": [
+                        {"kind": kind, "weight": value["w"], "intensity": value["i"]}
+                        for kind, value in pool.items()
+                    ]
+                }
+                for key, pool in self.library.items()
+            },
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def check_expiry(self, now: float | None = None) -> bool:
+        """Ask for a fresh batch after 24 hours without one."""
+        now = time.time() if now is None else now
+        if self.generated_at <= 0:
+            self.needs_write = True
+            self.write_reason = self.write_reason or "never"
+            return True
+        if now - self.generated_at >= BATCH_TTL_S and not self.needs_write:
+            self.needs_write = True
+            self.write_reason = "expired"
+        return self.needs_write
 
     # -- inputs -----------------------------------------------------------
 
@@ -106,27 +228,35 @@ class PresenceDirector:
     # -- scheduling -------------------------------------------------------
 
     def observe(self, inputs: dict) -> PresenceProfile:
-        """Update the profile; the pool switches only when the bucket does."""
+        """Update the profile; a bucket change asks for a fresh batch."""
         previous = self.profile.key
         self.profile = self._bucket(inputs)
         if self.profile.key != previous:
-            # A threshold was crossed: let the new pool take over promptly.
             self._next_at = 0.0
+            if self.generated_at > 0 or self.library:
+                self.needs_write = True
+                self.write_reason = "profile_change"
         return self.profile
 
+    def _pool(self) -> dict[str, dict[str, float]]:
+        if self.profile.key in self.library:
+            return self.library[self.profile.key]
+        return {
+            kind: {"w": weight, "i": 0.45 + 0.35 * min(1.0, self.profile.energy)}
+            for kind, weight in POOLS.get(self.profile.key, POOLS["calm"]).items()
+        }
+
     def _pick(self, now: float) -> tuple[str, float] | None:
-        pool = POOLS.get(self.profile.key, POOLS["calm"])
+        pool = self._pool()
         # Mouth kinds are excluded entirely when the mouth appetite is low.
         candidates = {
-            kind: weight
-            for kind, weight in pool.items()
+            kind: value
+            for kind, value in pool.items()
             if kind not in MOUTH_KINDS or self.profile.mouth >= 0.2
         }
         if not candidates:
             candidates = {
-                kind: weight
-                for kind, weight in pool.items()
-                if kind not in MOUTH_KINDS
+                kind: value for kind, value in pool.items() if kind not in MOUTH_KINDS
             }
         if not candidates:
             return None
@@ -136,20 +266,19 @@ class PresenceDirector:
         if not candidates:
             return None
         kinds = list(candidates)
-        weights = [candidates[kind] for kind in kinds]
+        weights = [candidates[kind]["w"] for kind in kinds]
         kind = self.rng.choices(kinds, weights=weights, k=1)[0]
         self._last = (self._last + [kind])[-4:]
-        intensity = 0.45 + 0.35 * min(1.0, self.profile.energy)
-        return kind, round(intensity, 3)
+        intensity = candidates[kind].get("i") or 0.45 + 0.35 * min(1.0, self.profile.energy)
+        return kind, round(min(1.2, max(0.1, intensity)), 3)
 
     def next_cue(self, now: float, *, speaking: bool) -> tuple[str, float] | None:
         """Return (kind, intensity) when it is time for an idle cue."""
         if speaking:
             return None
-        gap = self.rng.uniform(MIN_GAP, MAX_GAP)
         if now < self._next_at:
             return None
-        self._next_at = now + gap
+        self._next_at = now + self.rng.uniform(MIN_GAP, MAX_GAP)
         return self._pick(now)
 
 

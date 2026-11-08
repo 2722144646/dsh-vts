@@ -93,7 +93,8 @@ class AvatarEngine:
         self.user_id = "default"
         self.display_name = "default"
         self.presence = PresenceDirector(
-            base_energy=float(getattr(config.avatar, "idle_energy", 0.55))
+            base_energy=float(getattr(config.avatar, "idle_energy", 0.55)),
+            library_path=str(config.root / "data" / "presence" / "idle_library.json"),
         )
 
     def switch_user(self, user_id: str, display_name: str = "") -> dict[str, Any]:
@@ -913,6 +914,15 @@ class AvatarEngine:
                     text = (text + "\n" if text else "") + "（日记：今天还没写，记得用 vts_avatar_diary 写一篇，至少和昨天一样长）"
             except Exception:
                 pass
+        presence = getattr(self, "presence", None)
+        if presence is not None and presence.needs_write:
+            text = (text + "\n" if text else "") + (
+                "（待机动作需要重写：档位 "
+                + presence.profile.key
+                + "，原因 "
+                + (presence.write_reason or "unknown")
+                + "）"
+            )
         return {
             "ok": True,
             "text": text,
@@ -1174,10 +1184,19 @@ class AvatarEngine:
             "has_diary": has_diary,
         }
 
+    def idle_write(self, profile: str, actions: list, note: str = "") -> dict[str, Any]:
+        """Store a model-written idle batch (tool path)."""
+        try:
+            self.presence.save_batch(profile, actions, note)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "profile": profile, "actions": len(actions or [])}
+
     def _maybe_idle_cue(self, now: float) -> None:
         """Ask the presence director for the next idle motion, if any."""
         if self.mixer is None or self.mixer.state != "idle":
             return
+        self.presence.check_expiry(time.time())
         if self.mixer.actions:
             return  # something is already playing; never stack idle cues
         self.presence.observe(self._presence_inputs())

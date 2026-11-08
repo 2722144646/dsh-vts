@@ -111,6 +111,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
+      } else if (message.type === 'idle.write.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'user.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -774,6 +781,64 @@ export function apply(ctx, config = {}) {
           const result = await client.request('user.switch', {
             user_id: String(args?.user_id ?? ''),
             display_name: String(args?.display_name ?? ''),
+          });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_write_idle_actions',
+        description:
+          'Write a fresh batch of idle motions for one mood profile (calm/cozy/bright/low/tense). ' +
+          'Call it when the prompt says idle actions need a rewrite (threshold crossed or 24h old). ' +
+          'Pick 4-6 kinds with weights that match how she feels; mouth kinds (idle_sigh/idle_hum/idle_yawn) ' +
+          'only when a small exhale or hum fits. They are auto-suppressed while speaking.',
+        parameters: {
+          type: 'object',
+          properties: {
+            profile: {
+              type: 'string',
+              enum: ['calm', 'cozy', 'bright', 'low', 'tense'],
+            },
+            actions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  kind: {
+                    type: 'string',
+                    enum: [
+                      'idle_glance', 'idle_tilt', 'idle_nod', 'idle_breathe',
+                      'idle_look_user', 'idle_look_down', 'idle_look_away',
+                      'idle_sigh', 'idle_hum', 'idle_yawn',
+                    ],
+                  },
+                  weight: { type: 'number', minimum: 0.1, maximum: 5 },
+                  intensity: { type: 'number', minimum: 0.1, maximum: 1.2 },
+                },
+                required: ['kind', 'weight', 'intensity'],
+                additionalProperties: false,
+              },
+            },
+            note: { type: 'string' },
+          },
+          required: ['profile', 'actions'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value?.ok
+              ? `待机动作已重写：${value?.profile}，${value?.actions} 条`
+              : `写入失败：${value?.error ?? ''}`,
+          }],
+        },
+        async execute(args) {
+          const result = await client.request('idle.write', {
+            profile: String(args?.profile ?? ''),
+            actions: Array.isArray(args?.actions) ? args.actions : [],
+            note: String(args?.note ?? ''),
           });
           return { ...result, ok: result?.ok !== false };
         },
