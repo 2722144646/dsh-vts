@@ -178,6 +178,15 @@ class BridgeServer:
                     {"type": "hotkey.trigger.result", "request_id": msg.get("request_id"), "data": result}
                 ).decode("utf-8")
             )
+        elif mtype == "user.switch":
+            result = self.engine.switch_user(
+                str(msg.get("user_id") or ""), str(msg.get("display_name") or "")
+            )
+            await ws.send(
+                orjson.dumps(
+                    {"type": "user.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "relationship.event":
             result = self.engine.relationship_event(
                 str(msg.get("event") or ""), str(msg.get("note") or "")

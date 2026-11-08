@@ -90,3 +90,19 @@ def test_engine_relationship_event_and_trust_gated_share(tmp_path):
     gated = engine.private_action("share", item_id=added["id"])
     assert gated["ok"] is False
     assert "trust" in gated["error"]
+
+def test_engine_switch_user_isolates_stores(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    engine = AvatarEngine(config)
+    engine.private_action("add", content="给 u2 的私事", privacy=0.2)
+    assert engine.private_action("list")["items"]
+    assert engine.switch_user("u2", "小鹿")["ok"] is True
+    assert engine.private_action("list")["items"] == []
+    engine.private_action("add", content="u2 自己的", privacy=0.2)
+    assert len(engine.private_action("list")["items"]) == 1
+    assert engine.switch_user("default")["ok"] is True
+    assert len(engine.private_action("list")["items"]) == 1
