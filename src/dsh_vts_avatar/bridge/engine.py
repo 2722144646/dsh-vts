@@ -1267,6 +1267,72 @@ class AvatarEngine:
             return {"ok": False, "error": str(exc)}
         return {"ok": True, "restart_required": True}
 
+    def settings_snapshot(self) -> dict[str, Any]:
+        a, au, llm = self.config.avatar, self.config.audio, self.config.llm
+        return {
+            "ok": True,
+            "llm": {
+                "enabled": llm.enabled, "backend": llm.backend,
+                "endpoint": llm.endpoint, "model": llm.model,
+                "director_enabled": llm.director_enabled,
+                "director_model": llm.director_model,
+            },
+            "avatar": {
+                "head_gain": a.head_gain, "mouth_gain": a.mouth_gain,
+                "expression_gain": getattr(a, "expression_gain", 1.0),
+                "baseline_weight": a.baseline_weight, "blink_per_min": a.blink_per_min,
+            },
+            "audio": {
+                "device": au.device, "auto_calibrate": au.auto_calibrate,
+                "calibration_volume": au.calibration_volume,
+                "latency_ms": self.clock.auto_latency_ms() if hasattr(self.clock, "auto_latency_ms") else None,
+            },
+            "persona": llm.persona,
+            "user_id": self.user_id,
+        }
+
+    def save_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        from ..tools.panel import set_section_value
+        path = self.config.root / "config.toml"
+        try:
+            text = path.read_text(encoding="utf-8")
+            for section in ("llm", "avatar", "audio"):
+                block = values.get(section)
+                if isinstance(block, dict):
+                    for key, value in block.items():
+                        text = set_section_value(text, section, key, value)
+            persona = values.get("persona")
+            if isinstance(persona, str) and persona.strip():
+                text = set_section_value(text, "llm", "persona", persona.strip())
+            path.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "restart_required": True}
+
+    def open_diary_folder(self) -> dict[str, Any]:
+        import os
+        import subprocess
+        folder = self.config.root / "data" / "diary" / self.user_id
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            subprocess.Popen(["explorer", str(folder)], creationflags=0x08000000 if os.name == "nt" else 0)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "path": str(folder)}
+
+    def request_idle_write(self) -> dict[str, Any]:
+        self.presence.needs_write = True
+        self.presence.write_reason = "manual"
+        return {"ok": True, "profile": self.presence.profile.key}
+
+    async def recalibrate_audio(self) -> dict[str, Any]:
+        import asyncio
+        try:
+            value = await asyncio.to_thread(self.clock.calibrate_output_latency)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": value is not None, "latency_ms": value}
+
     def open_panel(self) -> dict[str, Any]:
         """Open the local settings panel (writes config.toml, never the host)."""
         import os

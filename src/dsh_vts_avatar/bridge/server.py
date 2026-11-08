@@ -179,6 +179,18 @@ class BridgeServer:
                     {"type": "llm.set.result", "request_id": msg.get("request_id"), **result}
                 ).decode("utf-8")
             )
+        elif mtype == "settings.get":
+            await ws.send(orjson.dumps({"type": "settings.get.result", "request_id": msg.get("request_id"), **self.engine.settings_snapshot()}).decode("utf-8"))
+        elif mtype == "settings.set":
+            result = self.engine.save_settings(msg.get("values") if isinstance(msg.get("values"), dict) else {})
+            await ws.send(orjson.dumps({"type": "settings.set.result", "request_id": msg.get("request_id"), **result}).decode("utf-8"))
+        elif mtype == "diary.folder":
+            await ws.send(orjson.dumps({"type": "diary.folder.result", "request_id": msg.get("request_id"), **self.engine.open_diary_folder()}).decode("utf-8"))
+        elif mtype == "idle.request":
+            await ws.send(orjson.dumps({"type": "idle.request.result", "request_id": msg.get("request_id"), **self.engine.request_idle_write()}).decode("utf-8"))
+        elif mtype == "audio.calibrate":
+            result = await self.engine.recalibrate_audio()
+            await ws.send(orjson.dumps({"type": "audio.calibrate.result", "request_id": msg.get("request_id"), **result}).decode("utf-8"))
         elif mtype == "panel.open":
             result = self.engine.open_panel()
             await ws.send(
