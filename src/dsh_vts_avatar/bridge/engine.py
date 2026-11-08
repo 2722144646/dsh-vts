@@ -563,7 +563,6 @@ class AvatarEngine:
             if not episodes:
                 return
             episodes.sort(key=lambda ep: ep.started_at or 0)
-            mood = store.mood(now)
             body = self._diary_narrative(episodes[-4:], now)
             header = f"# {time.strftime('%Y-%m-%d', time.localtime(now))}"
             diary.write(header + "\n\n" + body)
