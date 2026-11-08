@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "VTS Avatar",
+    "description": "Drives a VTube Studio avatar with phoneme-timed mouth movement, continuous expressions, and head/body motion."
+  }
+}

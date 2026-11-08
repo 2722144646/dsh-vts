@@ -5,6 +5,23 @@
 
 > **没有一键安装器，也没有开机自启**（2026-11-08 的决定）。使用就是按下面的顺序手动启动几样东西。
 
+## 快速开始
+
+```powershell
+cd E:\dsh-vts-avatar\project
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1   # 建 .venv、装依赖
+powershell -ExecutionPolicy Bypass -File scripts\start.ps1     # 启动桥接
+```
+
+然后在 dsh 里启用 `dsh-vts-avatar` 插件即可。
+
+打包给别人：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1
+# 产出 dist\dsh-vts-avatar-0.1.0.zip（不含 models / data / .venv）
+```
+
 ---
 
 ## 1. 需要先装好

@@ -16,6 +16,7 @@ import numpy as np
 
 from ..config import AvatarConfig
 from ..tts.timeline import Timeline, VisemeSegment
+from ..tts.visemes import VisemeSpec, map_phoneme
 from ..vts.profile import ModelProfile
 from .actions import ActionCue
 from .affect.composer import compose_face, compose_head
@@ -25,6 +26,25 @@ from .emotion import EXPRESSION_HEAD, EXPRESSION_TARGETS, EmotionState
 
 def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, float(value)))
+
+
+# Diphthongs are one Piper segment, but the mouth should travel through both
+# targets instead of holding a single shape. Values are (start, end) vowel
+# phones; the shape crossfades over the second half of the segment.
+DIPHTHONGS: dict[str, tuple[str, str]] = {
+    "ai": ("a", "i"),
+    "ei": ("e", "i"),
+    "ao": ("a", "o"),
+    "ou": ("o", "u"),
+    "ia": ("i", "a"),
+    "ie": ("i", "e"),
+    "ua": ("u", "a"),
+    "uo": ("u", "o"),
+    "iao": ("i", "o"),
+    "iou": ("i", "u"),
+    "uai": ("u", "i"),
+    "uei": ("u", "i"),
+}
 
 
 def smoothstep(x: float) -> float:
@@ -268,7 +288,7 @@ class PerformanceMixer:
         mouth_segment = bilabial or segment
 
         speech = (
-            self._speech(bilabial, env)
+            self._speech(bilabial, env, int(sample))
             if bilabial is not None
             else self._speech_coarticulated(timeline, int(sample), segment, env)
         )
@@ -543,7 +563,7 @@ class PerformanceMixer:
         slideshow. The viseme still owns the identity; neighbours only bleed
         into the transition.
         """
-        base = self._speech(segment, env)
+        base = self._speech(segment, env, sample)
         if timeline is None or len(timeline.segments) < 2:
             return base
         starts = getattr(timeline, "_starts", None)
@@ -559,21 +579,52 @@ class PerformanceMixer:
             # Keep bilabial closures crisp; blending a neighbouring vowel into
             # a 10-30ms /p/ or /m/ makes it look like the mouth never closes.
             return base
-        pre = max(1, int(self.sample_rate * 0.030))
-        post = max(1, int(self.sample_rate * 0.020))
-        if index > 0 and sample - current.start < pre:
-            previous = self._speech(timeline.segments[index - 1], env)
-            peak = 0.50 if current.kind == "vowel" and timeline.segments[index - 1].kind == "vowel" else 0.35
+        previous_seg = timeline.segments[index - 1] if index > 0 else None
+        following_seg = (
+            timeline.segments[index + 1]
+            if index + 1 < len(timeline.segments)
+            else None
+        )
+        vowel_vowel = (
+            segment.kind == "vowel"
+            and previous_seg is not None
+            and previous_seg.kind == "vowel"
+        )
+        # Vowel→vowel needs a wider transition to avoid a visible step;
+        # vowel→consonant closes faster so plosives still read as closed.
+        pre = max(1, int(self.sample_rate * (0.040 if vowel_vowel else 0.025)))
+        post = max(
+            1,
+            int(
+                self.sample_rate
+                * (0.030 if following_seg is not None and following_seg.kind == "vowel" else 0.018)
+            ),
+        )
+        if previous_seg is not None and sample - current.start < pre:
+            previous = self._speech(previous_seg, env, current.start)
+            peak = 0.55 if vowel_vowel else (0.40 if segment.kind == "vowel" else 0.30)
             weight = peak * (1.0 - (sample - current.start) / pre)
             return self._blend_speech(previous, base, 1.0 - weight)
-        if index + 1 < len(timeline.segments) and current.end - sample < post:
-            following = self._speech(timeline.segments[index + 1], env)
-            peak = 0.50 if current.kind == "vowel" and timeline.segments[index + 1].kind == "vowel" else 0.35
+        if following_seg is not None and current.end - sample < post:
+            following = self._speech(following_seg, env, current.end)
+            peak = 0.55 if vowel_vowel else (0.40 if following_seg.kind == "vowel" else 0.30)
             weight = peak * (1.0 - (current.end - sample) / post)
             return self._blend_speech(base, following, weight)
         return base
 
-    def _speech(self, segment: VisemeSegment, env: float) -> dict[str, object]:
+    def _vowel_shape(self, spec: VisemeSpec, env: float) -> dict[str, object]:
+        amp = 0.72 + 0.28 * env
+        vowel = spec.vowel_gain * (0.65 + 0.35 * env)
+        return {
+            "open": spec.open * amp,
+            "form": spec.form,
+            "voice": {self._voice_param(spec.viseme): vowel},
+            "viseme": spec.viseme,
+        }
+
+    def _speech(
+        self, segment: VisemeSegment, env: float, sample: int | None = None
+    ) -> dict[str, object]:
         if segment.kind == "silence":
             return {"open": 0.0, "form": 0.0, "voice": {}, "viseme": ""}
         if segment.kind == "consonant":
@@ -585,6 +636,17 @@ class PerformanceMixer:
             if segment.viseme:
                 voice = {self._voice_param(segment.viseme): segment.vowel_gain * 0.35}
             return {"open": open_value, "form": 0.0, "voice": voice, "viseme": segment.viseme}
+        pair = DIPHTHONGS.get((segment.phoneme or "").lower())
+        if pair and sample is not None and segment.end > segment.start:
+            progress = clamp(
+                (sample - segment.start) / float(segment.end - segment.start), 0.0, 1.0
+            )
+            # Hold the first target briefly, then travel; a linear ramp from
+            # the first millisecond reads as a twitch, not a diphthong.
+            weight = smoothstep(clamp((progress - 0.30) / 0.55, 0.0, 1.0))
+            first = self._vowel_shape(map_phoneme(pair[0], "zh"), env)
+            second = self._vowel_shape(map_phoneme(pair[1], "zh"), env)
+            return self._blend_speech(first, second, weight)
         # Vowel: RMS modulates amplitude, but the model's useful visual range
         # must be reached on normal speech; a low floor made every mouth look
         # half-open. The viseme openness already encodes the vowel identity.
