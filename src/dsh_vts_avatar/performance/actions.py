@@ -74,6 +74,8 @@ class ActionCue:
             return {}
         t = (sample - self.start) / max(1, self.duration)
         amp = max(0.0, min(1.4, self.intensity))
+        if self.kind.startswith("idle_"):
+            return self._idle_sample(t)
         if self.kind == "demo_nod":
             curve = _bezier if self.curve == "bezier" else _minjerk
             if t < 0.45:
@@ -165,6 +167,41 @@ class ActionCue:
             }
         return {}
 
+    def _idle_sample(self, t: float) -> dict[str, float]:
+        """Idle-library motions: small, slow, never a performance."""
+        amp = max(0.0, min(1.4, self.intensity))
+        hold = _hold(t, 0.12, 0.62)
+        slow = _hold(t, 0.10, 0.72)
+        if self.kind == "idle_glance":
+            return {"gaze_x": 0.35 * hold * amp, "roll": 1.5 * hold * amp}
+        if self.kind == "idle_look_down":
+            return {"gaze_y": -0.45 * hold * amp, "pitch": 2.5 * hold * amp}
+        if self.kind == "idle_look_away":
+            return {
+                "gaze_x": 0.42 * hold * amp,
+                "gaze_y": 0.08 * hold * amp,
+                "roll": 1.2 * hold * amp,
+            }
+        if self.kind == "idle_look_user":
+            return {
+                "gaze_y": 0.12 * hold * amp,
+                "smile": 0.06 * hold * amp,
+                "pitch": -0.8 * slow * amp,
+            }
+        if self.kind == "idle_tilt":
+            return {"roll": 4.5 * hold * amp}
+        if self.kind == "idle_nod":
+            return {"pitch": 2.2 * hold * amp}
+        if self.kind == "idle_breathe":
+            return {"pitch": 1.0 * slow * amp, "gaze_y": 0.04 * slow * amp}
+        if self.kind == "idle_sigh":
+            return {"open": 0.25 * hold * amp, "pitch": 2.0 * hold * amp}
+        if self.kind == "idle_hum":
+            return {"pucker": 0.25 * hold * amp, "smile": 0.06 * hold * amp}
+        if self.kind == "idle_yawn":
+            return {"open": 0.45 * hold * amp, "pitch": 1.5 * hold * amp}
+        return {}
+
     @classmethod
     def create(
         cls,
@@ -192,6 +229,16 @@ class ActionCue:
             "look_away": 950,
             "emphasis": 340,
             "sigh": 1800,
+            "idle_glance": 1200,
+            "idle_look_down": 1500,
+            "idle_look_away": 1200,
+            "idle_look_user": 1400,
+            "idle_tilt": 1100,
+            "idle_nod": 900,
+            "idle_breathe": 1800,
+            "idle_sigh": 1600,
+            "idle_hum": 1500,
+            "idle_yawn": 1800,
         }
         duration = duration_ms or durations.get(kind, 420)
         return cls(

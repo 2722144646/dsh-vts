@@ -138,6 +138,10 @@ class PerformanceMixer:
             state = "idle"
         self.state = state
         self._speech_target = 1.0 if state == "speaking" else 0.0
+        if state == "speaking":
+            # Idle motions yield the moment she starts talking; they must not
+            # keep driving the mouth or neck under the speech timeline.
+            self.actions = [cue for cue in self.actions if not cue.kind.startswith("idle_")]
 
     def set_profile(self, profile: ModelProfile | None, backend: str | None = None) -> None:
         self.profile = profile

@@ -23,6 +23,7 @@ from ..performance.relationship import RelationshipStore, DELTAS
 from ..performance.privacy import PrivacyStore
 from ..performance.diary import DiaryStore
 from ..performance.mouth_monitor import MouthMonitor
+from ..performance.presence import MOUTH_KINDS, PresenceDirector, idle_mouth_allowed
 from ..performance.recorder import record_expression
 from ..tts import PiperTTS, SyntheticTTS
 from ..tts.distill import DistilledPiperTTS
@@ -91,6 +92,9 @@ class AvatarEngine:
         self.diary = DiaryStore(config.root / "data")
         self.user_id = "default"
         self.display_name = "default"
+        self.presence = PresenceDirector(
+            base_energy=float(getattr(config.avatar, "idle_energy", 0.55))
+        )
 
     def switch_user(self, user_id: str, display_name: str = "") -> dict[str, Any]:
         """Switch the active person; every L2/L3 store follows."""
@@ -1148,6 +1152,45 @@ class AvatarEngine:
 
     # -- control loop ------------------------------------------------------
 
+    def _presence_inputs(self) -> dict[str, Any]:
+        """Everything the idle director needs, read fresh each tick."""
+        store = getattr(self, "episode_store", None)
+        now = time.time()
+        mood = store.mood(now) if store is not None else None
+        rel = getattr(self, "relationship", None)
+        state = getattr(rel, "state", None)
+        diary = getattr(self, "diary", None)
+        try:
+            has_diary = bool(diary.recent(1)) if diary is not None else False
+        except Exception:
+            has_diary = False
+        return {
+            "mood_labels": dict(getattr(mood, "labels", {}) or {}),
+            "mood_intensity": float(getattr(mood, "intensity", 0.0) or 0.0),
+            "trust": float(getattr(state, "trust", 0.5) or 0.5),
+            "closeness": float(getattr(state, "closeness", 0.2) or 0.2),
+            "friction": float(getattr(state, "friction", 0.0) or 0.0),
+            "dependency": float(getattr(state, "dependency", 0.0) or 0.0),
+            "has_diary": has_diary,
+        }
+
+    def _maybe_idle_cue(self, now: float) -> None:
+        """Ask the presence director for the next idle motion, if any."""
+        if self.mixer is None or self.mixer.state != "idle":
+            return
+        if self.mixer.actions:
+            return  # something is already playing; never stack idle cues
+        self.presence.observe(self._presence_inputs())
+        cue = self.presence.next_cue(now, speaking=False)
+        if cue is None:
+            return
+        kind, intensity = cue
+        if kind in MOUTH_KINDS and not idle_mouth_allowed(
+            self.mixer.state, self.timeline is not None
+        ):
+            return
+        self.mixer.add_action(kind, intensity)
+
     async def _tick_loop(self) -> None:
         period = 1.0 / 30.0
         next_at = asyncio.get_running_loop().time()
@@ -1199,6 +1242,7 @@ class AvatarEngine:
                     log.warning("VTS injection error: %s", err)
                 if self._should_idle(sample):
                     self.mixer.set_state("idle")
+                self._maybe_idle_cue(now)
                 if now - self._last_emit >= 0.10:
                     self._last_emit = now
                     await self._emit(
