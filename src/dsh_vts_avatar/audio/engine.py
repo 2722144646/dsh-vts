@@ -108,6 +108,23 @@ class AudioEngine:
                     self.config.device,
                 )
         try:
+            # Prefer the WASAPI default when "default" is requested. PortAudio's
+            # global default resolves through MME, which on this machine labels
+            # the 3.5mm jack "耳机" but actually routes to the speakers.
+            for host in self._sd.query_hostapis():
+                if "wasapi" in str(host.get("name", "")).lower():
+                    wasapi_out = int(host.get("default_output_device", -1))
+                    if wasapi_out >= 0:
+                        name = self._device_name(wasapi_out)
+                        if any(token in name.lower() for token in ("bluetooth", "wh-1000", "hands-free")):
+                            self.log.warning(
+                                "default output looks like Bluetooth (%s); use wired audio for low latency",
+                                name,
+                            )
+                        return wasapi_out
+        except Exception:
+            pass
+        try:
             default = self._sd.default.device
             # sounddevice returns an _InputOutputPair here, not a tuple/list.
             # The pair itself has [0]=input and [1]=output but is not a list.
