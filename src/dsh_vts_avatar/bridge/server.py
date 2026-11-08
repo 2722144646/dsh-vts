@@ -164,20 +164,6 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
-        elif mtype == "hotkey.list":
-            result = await self.engine.hotkey_list()
-            await ws.send(
-                orjson.dumps(
-                    {"type": "hotkey.list.result", "request_id": msg.get("request_id"), "data": result}
-                ).decode("utf-8")
-            )
-        elif mtype == "hotkey.trigger":
-            result = await self.engine.hotkey_trigger(str(msg.get("hotkey_id") or ""))
-            await ws.send(
-                orjson.dumps(
-                    {"type": "hotkey.trigger.result", "request_id": msg.get("request_id"), "data": result}
-                ).decode("utf-8")
-            )
         elif mtype == "user.switch":
             result = self.engine.switch_user(
                 str(msg.get("user_id") or ""), str(msg.get("display_name") or "")

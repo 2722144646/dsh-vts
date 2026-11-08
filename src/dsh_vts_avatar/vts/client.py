@@ -342,14 +342,6 @@ class VTSClient:
 
     async def statistics(self) -> dict[str, Any]:        return (await self.request("StatisticsRequest")).get("data") or {}
 
-    # -- hotkeys -----------------------------------------------------------
-
-    async def list_hotkeys(self) -> dict[str, Any]:
-        return (await self.request("HotkeyListRequest")).get("data") or {}
-
-    async def trigger_hotkey(self, hotkey_id: str) -> dict[str, Any]:
-        return (await self.request("HotkeyTriggerRequest", {"hotkeyID": hotkey_id})).get("data") or {}
-
     # -- injection ---------------------------------------------------------
 
     async def inject(

@@ -487,7 +487,7 @@ class AvatarEngine:
         path = diary.write(body)
         return {"ok": True, "path": str(path) if path else ""}
 
-    def _diary_narrative(self, episodes: list, mood, now: float) -> str:
+    def _diary_narrative(self, episodes: list, now: float) -> str:
         """Turn episodes into a first-person diary, not a ledger."""
         hour_words = (
             (6, "凌晨"), (9, "早上"), (12, "上午"), (14, "中午"),
@@ -564,7 +564,7 @@ class AvatarEngine:
                 return
             episodes.sort(key=lambda ep: ep.started_at or 0)
             mood = store.mood(now)
-            body = self._diary_narrative(episodes[-4:], mood, now)
+            body = self._diary_narrative(episodes[-4:], now)
             header = f"# {time.strftime('%Y-%m-%d', time.localtime(now))}"
             diary.write(header + "\n\n" + body)
         except Exception:  # never let a diary failure break speech
@@ -1025,12 +1025,6 @@ class AvatarEngine:
             "arousal": round(state.arousal, 4),
             "mood_text": self.mood_payload()["text"],
         }
-
-    async def hotkey_list(self) -> dict[str, Any]:
-        return await self.vts.list_hotkeys()
-
-    async def hotkey_trigger(self, hotkey_id: str) -> dict[str, Any]:
-        return await self.vts.trigger_hotkey(hotkey_id)
 
     async def record_expression(self, name: str, seconds: float = 4.0) -> dict[str, Any]:
         """Read-only capture of a user-performed expression.
