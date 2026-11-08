@@ -1199,7 +1199,7 @@ class AvatarEngine:
             "has_diary": has_diary,
         }
 
-    async def local_reply(self, user_text: str) -> dict[str, Any]:
+    async def local_reply(self, user_text: str, show_text: bool = False) -> dict[str, Any]:
         """Answer through the local model and speak it; never return the text."""
         cfg = self.config.llm
         if not cfg.enabled:
@@ -1230,7 +1230,42 @@ class AvatarEngine:
         except Exception as exc:
             return {"ok": False, "error": f"tts: {exc}", "chars": len(reply)}
         self._log_local_turn(text_in, reply)
-        return {"ok": True, "chars": len(reply), "model": cfg.model}
+        result = {"ok": True, "chars": len(reply), "model": cfg.model}
+        if show_text:
+            # Only the local UI asks for this; the host agent never does.
+            result["reply"] = reply
+        return result
+
+    def llm_settings(self) -> dict[str, Any]:
+        cfg = self.config.llm
+        return {
+            "ok": True,
+            "enabled": cfg.enabled,
+            "backend": cfg.backend,
+            "endpoint": cfg.endpoint,
+            "model": cfg.model,
+            "director_enabled": cfg.director_enabled,
+            "director_model": cfg.director_model,
+        }
+
+    def save_llm_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        from ..tools.panel import set_section_value
+
+        allowed = {
+            "enabled", "backend", "endpoint", "api_key", "model",
+            "director_enabled", "director_model",
+        }
+        path = self.config.root / "config.toml"
+        try:
+            text = path.read_text(encoding="utf-8")
+            for key, value in values.items():
+                if key not in allowed:
+                    continue
+                text = set_section_value(text, "llm", key, value)
+            path.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "restart_required": True}
 
     def open_panel(self) -> dict[str, Any]:
         """Open the local settings panel (writes config.toml, never the host)."""

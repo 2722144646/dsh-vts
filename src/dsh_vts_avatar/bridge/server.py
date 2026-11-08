@@ -164,6 +164,21 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "llm.get":
+            await ws.send(
+                orjson.dumps(
+                    {"type": "llm.get.result", "request_id": msg.get("request_id"), **self.engine.llm_settings()}
+                ).decode("utf-8")
+            )
+        elif mtype == "llm.set":
+            result = self.engine.save_llm_settings(
+                msg.get("values") if isinstance(msg.get("values"), dict) else {}
+            )
+            await ws.send(
+                orjson.dumps(
+                    {"type": "llm.set.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "panel.open":
             result = self.engine.open_panel()
             await ws.send(
@@ -179,7 +194,9 @@ class BridgeServer:
                 ).decode("utf-8")
             )
         elif mtype == "local.chat":
-            result = await self.engine.local_reply(str(msg.get("text") or ""))
+            result = await self.engine.local_reply(
+                str(msg.get("text") or ""), show_text=bool(msg.get("show_text"))
+            )
             await ws.send(
                 orjson.dumps(
                     {"type": "local.chat.result", "request_id": msg.get("request_id"), **result}
