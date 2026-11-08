@@ -6,3 +6,5 @@
 {"t":1794108406.1051707,"kind":"state","labels":{"sad":1.0},"intensity":0.9,"confidence":0.9,"valence":-0.7,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794108406.1029034,"applied":true}
 {"t":1794108430.751466,"kind":"evidence","source":"tool","labels":{"happy":1.0},"intensity":0.9,"confidence":0.9,"note":"","turn_id":"","timestamp":1794108430.751338}
 {"t":1794108430.7536407,"kind":"state","labels":{"happy":1.0},"intensity":0.9,"confidence":0.9,"valence":0.75,"arousal":0.55,"hold_until":0.0,"source":"fusion","updated_at":1794108430.751442,"applied":true}
+{"t":1794116150.3507903,"kind":"evidence","source":"tool","labels":{"shy":0.55,"happy":0.45},"intensity":0.45,"confidence":0.8,"note":"被要求撒娇，有点不好意思又开心","turn_id":"","timestamp":1794116150.3507102}
+{"t":1794116150.3627403,"kind":"state","labels":{"shy":0.55,"happy":0.45},"intensity":0.45,"confidence":0.8,"valence":0.4475,"arousal":0.44000000000000006,"hold_until":0.0,"source":"fusion","updated_at":1794116150.3507757,"applied":true}
