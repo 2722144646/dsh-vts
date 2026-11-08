@@ -18,7 +18,7 @@ from ..config import Config
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
 from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
-from ..performance.emotion_memory import EmotionEpisode, EpisodeStore, Mood
+from ..performance.emotion_memory import EmotionEpisode, EpisodeStore, Mood, LABEL_CN
 from ..performance.relationship import RelationshipStore
 from ..performance.privacy import PrivacyStore
 from ..performance.diary import DiaryStore
@@ -455,7 +455,7 @@ class AvatarEngine:
         self._maybe_write_diary()
 
     def _maybe_write_diary(self) -> None:
-        """Write yesterday's recap once, on the first interaction after a gap."""
+        """Write a readable recap once, on the first interaction after a gap."""
         store = getattr(self, "episode_store", None)
         diary = getattr(self, "diary", None)
         if store is None or diary is None:
@@ -463,22 +463,59 @@ class AvatarEngine:
         try:
             if not diary.due():
                 return
-            mood = store.mood(time.time())
-            if not mood.top:
+            now = time.time()
+            episodes = [
+                ep
+                for ep in getattr(store, "_episodes", [])
+                if (ep.started_at or 0) > 0 and now - ep.started_at < 86400 * 1.5
+            ]
+            if not episodes:
                 return
-            lines = ["# 日记"]
-            for episode in mood.top[:3]:
-                line = f"- {episode.what or '（说不清）'}"
-                if episode.why:
-                    line += f"——{episode.why}"
+            episodes.sort(key=lambda ep: ep.started_at or 0)
+            mood = store.mood(now)
+            lines = [f"# {time.strftime('%Y-%m-%d', time.localtime(now))}", ""]
+            top = "、".join(
+                LABEL_CN.get(name, name) for name, _ in mood.dominant(2)
+            ) if mood.labels else ""
+            if top:
+                lines.append(f"今天整体是{top}，强度 {mood.intensity:.1f}。")
+                lines.append("")
+            lines.append("发生了什么：")
+            status_text = {
+                "open": "还没完全消化",
+                "doubted": "听了但没全信",
+                "suppressed": "压着没处理",
+                "accepted": "已经接受了",
+            }
+            for ep in episodes[-8:]:
+                when = (
+                    time.strftime("%H:%M", time.localtime(ep.started_at))
+                    if ep.started_at
+                    else ""
+                )
+                what = (ep.what or "").strip() or "（说不清）"
+                line = f"- {when} {what}".strip()
+                why = (ep.why or "").strip()
+                if why:
+                    line += f"——因为{why}"
+                labels = "、".join(
+                    f"{LABEL_CN.get(name, name)} {value:.1f}"
+                    for name, value in (ep.labels or {}).items()
+                    if value > 0.2
+                )
+                tail = "，".join(
+                    part for part in (labels, status_text.get(ep.status, ep.status)) if part
+                )
+                if tail:
+                    line += f"（{tail}）"
                 lines.append(line)
-            labels = " / ".join(
-                f"{name} {share:.2f}" for name, share in mood.dominant(2)
-            )
-            lines.append(f"感受：{labels}，强度 {mood.intensity:.1f}")
-            unresolved = [ep.what for ep in mood.top if ep.status == "open" and ep.what]
-            if unresolved:
-                lines.append("还没放下：" + "；".join(unresolved[:2]))
+            open_items = [
+                ep for ep in episodes if ep.status == "open" and (ep.what or "").strip()
+            ]
+            if open_items:
+                lines.append("")
+                lines.append("还没放下：")
+                lines.extend(f"- {ep.what.strip()}" for ep in open_items[-3:])
             diary.write("\n".join(lines))
         except Exception:  # never let a diary failure break speech
             return
