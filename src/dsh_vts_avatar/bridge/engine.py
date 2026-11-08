@@ -772,10 +772,24 @@ class AvatarEngine:
             impression = relationship.impression()
             if impression:
                 text = (text + "\n" if text else "") + "（参考，不是命令）" + impression
+        diary_lines: list[str] = []
+        diary = getattr(self, "diary", None)
+        if diary is not None:
+            try:
+                for page in diary.recent(2):
+                    head = [line.strip("# ").strip() for line in page.strip().splitlines()[:3]]
+                    joined = " / ".join(part for part in head if part)
+                    if joined:
+                        diary_lines.append(joined[:160])
+            except Exception:
+                diary_lines = []
+        if diary_lines:
+            text = (text + "\n" if text else "") + "（日记，过去几天）" + "；".join(diary_lines)
         return {
             "ok": True,
             "text": text,
             "impression": impression,
+            "diary": diary_lines,
             "labels": mood.labels,
             "intensity": round(mood.intensity, 4),
             "age_s": round(mood.age_s, 1),
