@@ -1040,10 +1040,30 @@ class AvatarEngine:
                 self._last_model_check = now
                 asyncio.create_task(self._refresh_model(), name="avatar-model-refresh")
             if self.clock is not None and self.mixer is not None:
-                sample = self.clock.now_sample()
+                if self.timeline is None:
+                    # Idle: the audio clock is stopped, so advance our own
+                    # sample counter from wall time — otherwise every action
+                    # cue is frozen at sample 0 and never animates.
+                    now_s = time.perf_counter()
+                    if not hasattr(self, "_idle_origin") or self._idle_origin is None:
+                        self._idle_origin = now_s
+                    sample = int((now_s - self._idle_origin) * self.mixer.sample_rate)
+                else:
+                    sample = self.clock.now_sample()
                 self._last_sample = sample
                 params = self.mixer.compute(sample, self.timeline, now)
                 self._last_params = params
+                # TEMP (2026-11-07): log the params an action actually injects.
+                if params and getattr(self.mixer, "actions", None):
+                    cue = self.mixer.actions[0]
+                    log.info(
+                        "action params mouth=%s head_y=%s cue.start=%s sample=%s finished=%s",
+                        round(params.get(self.mixer.avatar.mouth_open, -1.0), 3),
+                        round(params.get(self.mixer.avatar.head_y, -1.0), 3),
+                        getattr(cue, "start", None),
+                        sample,
+                        getattr(cue, "finished", None),
+                    )
                 if self.timeline is not None:
                     mouth_segment = self.timeline.at(sample)
                     audible = self.timeline.rms_at(sample) > 0.01 or (
