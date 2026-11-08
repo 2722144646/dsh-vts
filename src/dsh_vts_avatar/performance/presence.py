@@ -201,14 +201,24 @@ class PresenceDirector:
         energy = self.base_energy * (0.75 + 0.5 * max(intensity, 0.15))
         mouth = 0.15 + bright * 0.4 + max(sad - 0.4, 0.0) * 0.3
 
-        if tension >= 0.45:
+        # Hysteresis: once a bucket is active it takes a wider margin to leave
+        # it. Without this, values sitting on a threshold (bright 0.45) flip the
+        # bucket every tick, which resets the cue clock and makes the model fire
+        # once a second.
+        prev = self.profile.key
+        bright_gate = 0.40 if prev == "bright" else 0.45
+        sad_gate = 0.30 if prev == "low" else 0.35
+        tension_gate = 0.40 if prev == "tense" else 0.45
+        warmth_gate = 0.50 if prev == "cozy" else 0.55
+
+        if tension >= tension_gate:
             key = "tense"
             mouth *= 0.2
-        elif sad >= 0.35 and bright < 0.3:
+        elif sad >= sad_gate and bright < 0.3:
             key = "low"
-        elif bright >= 0.45:
+        elif bright >= bright_gate:
             key = "bright"
-        elif warmth >= 0.55:
+        elif warmth >= warmth_gate:
             key = "cozy"
         else:
             key = "calm"
@@ -246,6 +256,18 @@ class PresenceDirector:
             kind: {"w": weight, "i": 0.45 + 0.35 * min(1.0, self.profile.energy)}
             for kind, weight in POOLS.get(self.profile.key, POOLS["calm"]).items()
         }
+
+    def pool_kinds(self) -> list[str]:
+        """Kinds the model may choose from right now (same pool as _pick)."""
+        return list(self._pool().keys())
+
+    def recent(self) -> list[str]:
+        """The last few kinds, so the model can avoid repeating itself."""
+        return list(self._last[-3:])
+
+    def note(self, kind: str) -> None:
+        """Remember a kind the model picked, so recent stays truthful."""
+        self._last = (self._last + [kind])[-4:]
 
     def _pick(self, now: float) -> tuple[str, float] | None:
         pool = self._pool()
