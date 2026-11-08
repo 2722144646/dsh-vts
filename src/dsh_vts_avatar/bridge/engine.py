@@ -1190,6 +1190,12 @@ class AvatarEngine:
         ):
             return
         self.mixer.add_action(kind, intensity)
+        log.info(
+            "idle cue: %s (%.2f) profile=%s",
+            kind,
+            intensity,
+            self.presence.profile.key,
+        )
 
     async def _tick_loop(self) -> None:
         period = 1.0 / 30.0
