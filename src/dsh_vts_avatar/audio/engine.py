@@ -342,6 +342,13 @@ class AudioEngine:
 
     def append(self, audio: np.ndarray) -> None:
         data = _resample(audio, self.source_rate, self.sample_rate)
+        # Short fades at chunk edges: without them the jump from silence to
+        # waveform (and the cut back to silence at the end) is an audible click.
+        fade = min(int(self.sample_rate * 0.004), max(1, data.size // 4))
+        if fade > 1 and data.size > fade * 2:
+            data = data.copy()
+            data[:fade] *= np.linspace(0.0, 1.0, fade, dtype=np.float32)
+            data[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)
         with self._lock:
             # A little silence between chunks avoids clicks at boundaries.
             self._audio = np.concatenate([self._audio, data])
