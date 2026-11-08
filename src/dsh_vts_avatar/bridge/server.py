@@ -185,6 +185,13 @@ class BridgeServer:
                     {"type": "hotkey.trigger.result", "request_id": msg.get("request_id"), "data": result}
                 ).decode("utf-8")
             )
+        elif mtype == "diary.write":
+            result = self.engine.diary_write(str(msg.get("text") or ""))
+            await ws.send(
+                orjson.dumps(
+                    {"type": "diary.write.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "private":
             result = self.engine.private_action(
                 action=str(msg.get("action") or "list"),

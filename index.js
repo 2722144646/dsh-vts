@@ -111,6 +111,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
+      } else if (message.type === 'diary.write.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'private.result' || message.type === 'recall.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -659,6 +666,31 @@ export function apply(ctx, config = {}) {
             query: String(args?.query ?? ''),
             count: Number(args?.count ?? 3),
           });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_diary',
+        description:
+          'Write today\'s diary in your own voice (first person, real events, feelings, reflection). ' +
+          'Call it at the end of a day or when something mattered. text is the full page; the date ' +
+          'header is added by the bridge.',
+        parameters: {
+          type: 'object',
+          properties: { text: { type: 'string', description: 'Diary page body.' } },
+          required: ['text'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value?.ok ? `日记已写入 ${value?.path ?? ''}` : `日记没写成：${value?.error ?? ''}`,
+          }],
+        },
+        async execute(args) {
+          const result = await client.request('diary.write', { text: String(args?.text ?? '') });
           return { ...result, ok: result?.ok !== false };
         },
       }),
