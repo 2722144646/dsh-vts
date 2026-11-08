@@ -1,0 +1,2 @@
+{"t":1794101537.1227806,"kind":"evidence","source":"tool","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"note":"","turn_id":"","timestamp":1794101537.1227136}
+{"t":1794101537.1249917,"kind":"state","labels":{"relieved":1.0},"intensity":1.0,"confidence":1.0,"valence":0.35,"arousal":0.2,"hold_until":0.0,"source":"fusion","updated_at":1794101537.1227658,"applied":true}
