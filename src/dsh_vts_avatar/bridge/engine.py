@@ -16,7 +16,7 @@ import numpy as np
 from ..audio.engine import Clock, make_clock
 from ..config import Config
 from ..ndi.capture import NDICapture
-from ..performance import PerformanceMixer, emotion_from_text, strip_emotion_tags
+from ..performance import PerformanceMixer, strip_emotion_tags
 from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
 from ..performance.emotion_memory import EmotionEpisode, EpisodeStore, Mood, LABEL_CN
 from ..performance.relationship import RelationshipStore
@@ -525,7 +525,7 @@ class AvatarEngine:
         return "\n\n".join(parts)
 
     def _maybe_write_diary(self) -> None:
-        """Write a readable recap once, on the first interaction after a gap."""
+        """Fallback template recap — the model normally writes the diary itself."""
         store = getattr(self, "episode_store", None)
         diary = getattr(self, "diary", None)
         if store is None or diary is None:
@@ -977,17 +977,6 @@ class AvatarEngine:
             "valence": round(state.valence, 4),
             "arousal": round(state.arousal, 4),
             "mood_text": self.mood_payload()["text"],
-        }
-
-    def play_sigh(self) -> dict[str, Any]:
-        """Direct trigger for testing the haqi cue (bypasses feel)."""
-        if self.mixer is None:
-            return {"ok": False, "error": "mixer not ready"}
-        cue = self.mixer.add_action("sigh", 1.0)
-        return {
-            "ok": cue is not None,
-            "kind": getattr(cue, "kind", ""),
-            "duration": getattr(cue, "duration", 0),
         }
 
     async def hotkey_list(self) -> dict[str, Any]:

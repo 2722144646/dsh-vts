@@ -32,6 +32,10 @@ from .schema import AffectEvidence, AffectState, derive_valence_arousal, normali
 #: but it is still only a mid-weight vote — nothing hard-overrides.
 SOURCE_WEIGHTS: dict[str, float] = {
     "tool": 1.0,
+    # Disabled producers (2026-11-07): tags and keywords no longer create
+    # evidence, and the semantic classifier was cancelled. The weights stay
+    # documented so old logs remain interpretable and a future producer can
+    # opt back in without re-deciding the numbers.
     "tag": 0.85,
     "context": 0.75,
     "classifier": 0.7,
