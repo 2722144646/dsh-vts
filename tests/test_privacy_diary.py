@@ -106,3 +106,14 @@ def test_engine_switch_user_isolates_stores(tmp_path):
     assert len(engine.private_action("list")["items"]) == 1
     assert engine.switch_user("default")["ok"] is True
     assert len(engine.private_action("list")["items"]) == 1
+
+def test_mood_prompt_names_the_active_user(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    engine = AvatarEngine(config)
+    assert "当前用户" not in engine.mood_payload()["text"]
+    engine.switch_user("u2", "小鹿")
+    assert "小鹿" in engine.mood_payload()["text"]
