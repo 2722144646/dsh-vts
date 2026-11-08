@@ -237,15 +237,12 @@ class AvatarEngine:
         requested = (self.config.avatar.mouth_backend or "auto").lower()
         if requested not in ("auto", ""):
             return requested
-        try:
-            path = self.config.root / "data" / "mouth_strategy.json"
-            data = json.loads(path.read_text(encoding="utf-8"))
-            model_id = str((data.get("model") or {}).get("modelID") or "")
-            strategy = str(data.get("strategy") or "").lower()
-        except Exception:
+        from ..performance.mouth_strategy import load_strategy
+
+        data = load_strategy(self.config.profile_dir, self.config.root, profile.model_id)
+        if not data:
             return profile.choose_mouth_backend(self.config.avatar, "auto")
-        if model_id and model_id != profile.model_id:
-            return profile.choose_mouth_backend(self.config.avatar, "auto")
+        strategy = str(data.get("strategy") or "").lower()
         voices = profile.voice_params(self.config.avatar)
         has_voice = all(name in profile.input_params for name in voices)
         has_smile = self.config.avatar.mouth_smile in profile.input_params

@@ -164,9 +164,13 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
                 if strategy == "hybrid"
                 else "only one channel moves enough for lip shape"
             )
-            Path("data/mouth_strategy.json").write_text(
-                json.dumps({"model": model, **mouth_strategy}, ensure_ascii=False, indent=2),
-                encoding="utf-8",
+            from dsh_vts_avatar.performance.mouth_strategy import save_strategy
+
+            save_strategy(
+                pathlib.Path("data/profiles"),
+                pathlib.Path("."),
+                str(model.get("modelID") or "unknown"),
+                {"model": model, **mouth_strategy},
             )
             report = {
                 "model": model,
