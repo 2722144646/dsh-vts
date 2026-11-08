@@ -454,6 +454,17 @@ class AvatarEngine:
                 self.mixer.set_state("idle")
         self._maybe_write_diary()
 
+    def diary_write(self, text: str) -> dict[str, Any]:
+        """Let the model write today's diary itself (better than a template)."""
+        diary = getattr(self, "diary", None)
+        if diary is None:
+            return {"ok": False, "error": "diary not ready"}
+        body = (text or "").strip()
+        if len(body) < 20:
+            return {"ok": False, "error": "too short"}
+        path = diary.write(body)
+        return {"ok": True, "path": str(path) if path else ""}
+
     def _diary_narrative(self, episodes: list, mood, now: float) -> str:
         """Turn episodes into a first-person diary, not a ledger."""
         hour_words = (
