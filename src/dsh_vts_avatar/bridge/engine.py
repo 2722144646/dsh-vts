@@ -1232,6 +1232,26 @@ class AvatarEngine:
         self._log_local_turn(text_in, reply)
         return {"ok": True, "chars": len(reply), "model": cfg.model}
 
+    def open_panel(self) -> dict[str, Any]:
+        """Open the local settings panel (writes config.toml, never the host)."""
+        import os
+        import subprocess
+        import sys
+
+        script = Path(__file__).resolve().parents[1] / "tools" / "panel.py"
+        if not script.exists():
+            return {"ok": False, "error": "panel script missing"}
+        config = self.config.root / "config.toml"
+        flags = 0x08000000 if os.name == "nt" else 0
+        try:
+            subprocess.Popen(
+                [sys.executable, str(script), "--config", str(config)],
+                creationflags=flags,
+            )
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "config": str(config)}
+
     def open_transcript_window(self) -> dict[str, Any]:
         """Open the local transcript viewer (no content passes through the host)."""
         import os

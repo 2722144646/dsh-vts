@@ -164,6 +164,13 @@ class BridgeServer:
                     }
                 ).decode("utf-8")
             )
+        elif mtype == "panel.open":
+            result = self.engine.open_panel()
+            await ws.send(
+                orjson.dumps(
+                    {"type": "panel.open.result", "request_id": msg.get("request_id"), **result}
+                ).decode("utf-8")
+            )
         elif mtype == "transcript.window":
             result = self.engine.open_transcript_window()
             await ws.send(
