@@ -9,7 +9,7 @@ def test_engine_private_add_list_share(tmp_path):
     config = Config(root=tmp_path)
     config.emotion = EmotionConfig(mode="affect")
     engine = AvatarEngine(config)
-    added = engine.private_action("add", content="我很怕他不来了", kind="feeling", privacy=0.8)
+    added = engine.private_action("add", content="我很怕他不来了", kind="feeling", privacy=0.2)
     assert added["ok"] is True
     listed = engine.private_action("list")
     assert len(listed["items"]) == 1
@@ -76,3 +76,17 @@ def test_mood_payload_includes_recent_diary(tmp_path):
     payload = engine.mood_payload()
     assert payload["diary"]
     assert "不在乎" in payload["text"]
+
+def test_engine_relationship_event_and_trust_gated_share(tmp_path):
+    from dsh_vts_avatar.bridge.engine import AvatarEngine
+    from dsh_vts_avatar.config import Config, EmotionConfig
+
+    config = Config(root=tmp_path)
+    config.emotion = EmotionConfig(mode="affect")
+    engine = AvatarEngine(config)
+    assert engine.relationship_event("promise_kept")["ok"] is True
+    assert engine.relationship_event("not_an_event")["ok"] is False
+    added = engine.private_action("add", content="我只跟很信任的人说", privacy=1.0)
+    gated = engine.private_action("share", item_id=added["id"])
+    assert gated["ok"] is False
+    assert "trust" in gated["error"]

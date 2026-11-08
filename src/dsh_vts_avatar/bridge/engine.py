@@ -19,7 +19,7 @@ from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, strip_emotion_tags
 from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
 from ..performance.emotion_memory import EmotionEpisode, EpisodeStore, Mood, LABEL_CN
-from ..performance.relationship import RelationshipStore
+from ..performance.relationship import RelationshipStore, DELTAS
 from ..performance.privacy import PrivacyStore
 from ..performance.diary import DiaryStore
 from ..performance.mouth_monitor import MouthMonitor
@@ -747,6 +747,16 @@ class AvatarEngine:
             "mood_text": self.mood_payload()["text"],
         }
 
+    def relationship_event(self, event: str, note: str = "") -> dict[str, Any]:
+        """Record one relationship event the model judged as real."""
+        rel = getattr(self, "relationship", None)
+        if rel is None:
+            return {"ok": False, "error": "relationship not ready"}
+        if event not in DELTAS:
+            return {"ok": False, "error": f"unknown event: {event}"}
+        rel.apply(event, note=(note or "")[:120])
+        return {"ok": True, "event": event}
+
     def private_action(
         self,
         action: str,
@@ -773,10 +783,23 @@ class AvatarEngine:
                 ],
             }
         if action == "share":
-            item = store.mark_shared(item_id) if item_id else None
+            if not item_id:
+                return {"ok": False, "error": "item_id required"}
+            item = next((it for it in store.unshared() if it.id == item_id), None)
             if item is None:
                 return {"ok": False, "error": "no such private item"}
-            self.relationship.apply("vulnerability_shared", note=item.content[:40])
+            rel = getattr(self, "relationship", None)
+            trust = rel.state.trust if rel is not None else 0.0
+            if not store.can_share(item, trust):
+                return {
+                    "ok": False,
+                    "error": "trust too low for this one",
+                    "required": round(item.required, 3),
+                    "trust": round(trust, 3),
+                }
+            store.mark_shared(item_id)
+            if rel is not None:
+                rel.apply("vulnerability_shared", note=item.content[:40])
             return {"ok": True, "id": item.id, "shared": True}
         return {"ok": False, "error": "unknown action"}
 
