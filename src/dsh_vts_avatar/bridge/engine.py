@@ -1225,6 +1225,26 @@ class AvatarEngine:
         self._log_local_turn(text_in, reply)
         return {"ok": True, "chars": len(reply), "model": cfg.model}
 
+    def open_transcript_window(self) -> dict[str, Any]:
+        """Open the local transcript viewer (no content passes through the host)."""
+        import os
+        import subprocess
+        import sys
+
+        script = Path(__file__).resolve().parents[1] / "tools" / "chat_viewer.py"
+        if not script.exists():
+            return {"ok": False, "error": "viewer script missing"}
+        chat = self.config.root / "data" / "chat" / f"{self.user_id}.jsonl"
+        flags = 0x08000000 if os.name == "nt" else 0
+        try:
+            subprocess.Popen(
+                [sys.executable, str(script), "--file", str(chat)],
+                creationflags=flags,
+            )
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "file": str(chat)}
+
     def _log_local_turn(self, user_text: str, reply: str) -> None:
         """Keep the raw transcript on disk; it is never sent through the host."""
         try:
