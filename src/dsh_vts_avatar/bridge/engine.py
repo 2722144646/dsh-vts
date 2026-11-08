@@ -454,6 +454,64 @@ class AvatarEngine:
                 self.mixer.set_state("idle")
         self._maybe_write_diary()
 
+    def _diary_narrative(self, episodes: list, mood, now: float) -> str:
+        """Turn episodes into a first-person diary, not a ledger."""
+        hour_words = (
+            (6, "凌晨"), (9, "早上"), (12, "上午"), (14, "中午"),
+            (18, "下午"), (22, "晚上"), (24, "深夜"),
+        )
+
+        def when(ts: float) -> str:
+            hour = time.localtime(ts).tm_hour
+            for limit, word in hour_words:
+                if hour < limit:
+                    return word
+            return "深夜"
+
+        leads = ("有些", "有点", "挺", "其实挺")
+
+        def feelings(ep) -> str:
+            names = [
+                LABEL_CN.get(name, name)
+                for name, value in (ep.labels or {}).items()
+                if value > 0.2
+            ]
+            if not names:
+                return "心里说不上来是什么滋味"
+            lead = leads[sum(ord(ch) for ch in (ep.what or "x")) % len(leads)]
+            return "心里" + lead + "、".join(names)
+
+        status_closing = {
+            "accepted": "后来想通了，也就接受了。",
+            "doubted": "他解释之后我信了一半，另一半还悬着。",
+            "suppressed": "我没把这份情绪说出口，压着，也没真处理。",
+            "open": "到现在还有点没消化完，就先记在这里吧。",
+        }
+        parts: list[str] = []
+        first = episodes[0]
+        what = (first.what or "").strip() or "发生了一件事"
+        opening = f"今天{when(first.started_at)}，{what}。{feelings(first)}。"
+        why = (first.why or "").strip()
+        names = [LABEL_CN.get(n, n) for n, v in (first.labels or {}).items() if v > 0.2]
+        if why and not any(name in why for name in names):
+            opening += f"{why}，所以才会这样。"
+        parts.append(opening)
+        for ep in episodes[1:4]:
+            text = (ep.what or "").strip()
+            if not text:
+                continue
+            sentence = f"后来，{text}。{feelings(ep)}。"
+            why = (ep.why or "").strip()
+            names = [LABEL_CN.get(n, n) for n, v in (ep.labels or {}).items() if v > 0.2]
+            if why and not any(name in why for name in names):
+                sentence += f"{why}。"
+            parts.append(sentence)
+        closing = status_closing.get(episodes[-1].status, "")
+        if closing:
+            parts.append(closing)
+        parts.append("——今天大概就是这样。")
+        return "\n\n".join(parts)
+
     def _maybe_write_diary(self) -> None:
         """Write a readable recap once, on the first interaction after a gap."""
         store = getattr(self, "episode_store", None)
@@ -473,50 +531,9 @@ class AvatarEngine:
                 return
             episodes.sort(key=lambda ep: ep.started_at or 0)
             mood = store.mood(now)
-            lines = [f"# {time.strftime('%Y-%m-%d', time.localtime(now))}", ""]
-            top = "、".join(
-                LABEL_CN.get(name, name) for name, _ in mood.dominant(2)
-            ) if mood.labels else ""
-            if top:
-                lines.append(f"今天整体是{top}，强度 {mood.intensity:.1f}。")
-                lines.append("")
-            lines.append("发生了什么：")
-            status_text = {
-                "open": "还没完全消化",
-                "doubted": "听了但没全信",
-                "suppressed": "压着没处理",
-                "accepted": "已经接受了",
-            }
-            for ep in episodes[-8:]:
-                when = (
-                    time.strftime("%H:%M", time.localtime(ep.started_at))
-                    if ep.started_at
-                    else ""
-                )
-                what = (ep.what or "").strip() or "（说不清）"
-                line = f"- {when} {what}".strip()
-                why = (ep.why or "").strip()
-                if why:
-                    line += f"——因为{why}"
-                labels = "、".join(
-                    f"{LABEL_CN.get(name, name)} {value:.1f}"
-                    for name, value in (ep.labels or {}).items()
-                    if value > 0.2
-                )
-                tail = "，".join(
-                    part for part in (labels, status_text.get(ep.status, ep.status)) if part
-                )
-                if tail:
-                    line += f"（{tail}）"
-                lines.append(line)
-            open_items = [
-                ep for ep in episodes if ep.status == "open" and (ep.what or "").strip()
-            ]
-            if open_items:
-                lines.append("")
-                lines.append("还没放下：")
-                lines.extend(f"- {ep.what.strip()}" for ep in open_items[-3:])
-            diary.write("\n".join(lines))
+            body = self._diary_narrative(episodes[-4:], mood, now)
+            header = f"# {time.strftime('%Y-%m-%d', time.localtime(now))}"
+            diary.write(header + "\n\n" + body)
         except Exception:  # never let a diary failure break speech
             return
 
