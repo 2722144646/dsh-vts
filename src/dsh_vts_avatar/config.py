@@ -156,7 +156,9 @@ class LLMConfig:
     """Local Ollama model used for the private (uncensored) speech path."""
 
     enabled: bool = False
+    backend: str = "ollama"
     endpoint: str = "http://127.0.0.1:11434"
+    api_key: str = ""
     model: str = "qwen3-8b-abliterated"
     timeout_s: float = 180.0
     history_turns: int = 8
@@ -347,7 +349,9 @@ def load_config(path: str | Path | None = None) -> Config:
     cfg.emotion = EmotionConfig(mode=mode)
     cfg.llm = LLMConfig(
         enabled=bool(llm_raw.get("enabled", False)),
+        backend=str(llm_raw.get("backend", "ollama")),
         endpoint=str(llm_raw.get("endpoint", "http://127.0.0.1:11434")),
+        api_key=str(llm_raw.get("api_key", "")),
         model=str(llm_raw.get("model", "qwen3-8b-abliterated")),
         timeout_s=float(llm_raw.get("timeout_s", 180.0)),
         history_turns=int(llm_raw.get("history_turns", 8)),
