@@ -82,6 +82,53 @@ VTS 的 API 端口会自动探测（常见 8002 / 8003）；不需要手写端�
 | `vts_avatar_transcript_window` | 打开本地聊天记录窗口 |
 | `vts_avatar_record` | 只读录制用户示范的表情 |
 
+## 不装 dsh：当独立驱动器用
+
+桥接不依赖 dsh，可以单独当「语音 + 表情 + 嘴型」的 VTS 驱动器。
+
+### 念一句就退出
+
+```powershell
+.venv\Scripts\python.exe -m dsh_vts_avatar --config config.toml demo "你好呀，这是我自己接的。"
+```
+
+这条命令会自己起引擎、说一句、退出，不占 8765。
+
+### 常驻桥接 + 自己的程序接
+
+```powershell
+.venv\Scripts\python.exe -m dsh_vts_avatar --config config.toml serve
+```
+
+然后用自己的程序连 `ws://127.0.0.1:8765`：
+
+```python
+import asyncio, json, websockets
+
+async def main():
+    async with websockets.connect("ws://127.0.0.1:8765") as ws:
+        await ws.send(json.dumps({"type": "hello", "client": "my-app", "protocol": 1}))
+        await ws.send(json.dumps({"type": "utterance.start", "utterance_id": "u1"}))
+        await ws.send(json.dumps({"type": "text.delta", "text": "这句话是我自己的程序喂进来的。"}))
+        await ws.send(json.dumps({"type": "utterance.end"}))
+        await asyncio.sleep(6)  # 等说完
+
+asyncio.run(main())
+```
+
+常用消息：
+
+| 类型 | 作用 |
+|---|---|
+| `utterance.start` / `text.delta` / `utterance.end` | 说一段话（嘴型按音素时间轴走） |
+| `cancel` | 打断 |
+| `feel` | 给情绪（labels / intensity / confidence / cause） |
+| `emotion` | 强制表情预设（name / intensity） |
+| `action` | 做一个动作（kind / intensity） |
+| `mood.get` | 读当前情绪 |
+
+没有 dsh 时**不会**有的：自动接住对话流、`vts_avatar_*` 那套工具（feel/diary/relationship/local_say/panel 都是 dsh 侧接口）。私有对话那条路也只能走自己的程序调 `local.chat`。
+
 ## 4. 本地模型（可选）
 
 默认**不加载**任何模型；显存占用为 0。
