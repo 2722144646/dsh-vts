@@ -287,7 +287,10 @@ class PerformanceMixer:
             mouth_open *= 0.25
         voice = speech["voice"]
 
-        eye_base = clamp(emotional["eye"] * blink, 0.0, 1.0)
+        # Blink is applied after smoothing (below): the 0.16s blink is faster
+        # than the eye spring, so multiplying the target here only ever closed
+        # the eyes part-way ("眨巴一下" without a real blink).
+        eye_base = clamp(emotional["eye"], 0.0, 1.0)
         brow = emotional["brow"]
         angry = emotional["angry"]
 
@@ -391,8 +394,12 @@ class PerformanceMixer:
                 gate = 0.0 if (self.state == "speaking" or wants_mouth) else 1.0
                 params[a.voice_silence] = self._sv(a.voice_silence, gate, dt, 0.18, 0.45)
         params[a.mouth_smile] = self._sv(a.mouth_smile, smile, dt, 0.18, 0.55)
-        params[a.eye_left] = self._sv(a.eye_left, eye_base, dt, 0.07, 0.18)
-        params[a.eye_right] = self._sv(a.eye_right, eye_base, dt, 0.07, 0.18)
+        params[a.eye_left] = clamp(
+            self._sv(a.eye_left, eye_base, dt, 0.07, 0.18) * blink, 0.0, 1.0
+        )
+        params[a.eye_right] = clamp(
+            self._sv(a.eye_right, eye_base, dt, 0.07, 0.18) * blink, 0.0, 1.0
+        )
         if (self.avatar.head_motion or "minjerk").lower() == "spring":
             head_smooth = lambda name, target: self._spring(
                 name,
