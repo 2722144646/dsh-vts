@@ -1517,7 +1517,8 @@ class AvatarEngine:
                 )
                 if self.vts.authenticated and params:
                     try:
-                        await self.vts.inject(params)
+                        if not getattr(self, "_inject_paused", False):
+                            await self.vts.inject(params)
                     except Exception as exc:
                         if not self._last_error:
                             self._last_error = str(exc)

@@ -335,6 +335,23 @@ class BridgeServer:
                 seconds=float(msg.get("seconds", 8.0)),
             )
             await ws.send(orjson.dumps({"type": "head_pose.result", "ok": ok}).decode("utf-8"))
+        elif mtype == "inject.pause":
+            self.engine._inject_paused = bool(msg.get("paused"))
+            await ws.send(orjson.dumps({"type": "inject.pause.result", "request_id": msg.get("request_id"), "ok": True}).decode("utf-8"))
+        elif mtype == "params.inject":
+            values = msg.get("params") if isinstance(msg.get("params"), dict) else {}
+            injected = {}
+            for key, value in values.items():
+                try:
+                    injected[str(key)] = float(value)
+                except (TypeError, ValueError):
+                    continue
+            try:
+                await self.engine.vts.inject(injected)
+                result = {"ok": True, "count": len(injected)}
+            except Exception as exc:
+                result = {"ok": False, "error": str(exc)}
+            await ws.send(orjson.dumps({"type": "params.inject.result", "request_id": msg.get("request_id"), **result}).decode("utf-8"))
         elif mtype == "parameters":
             await ws.send(
                 orjson.dumps(
