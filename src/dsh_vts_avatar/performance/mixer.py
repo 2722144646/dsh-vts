@@ -297,11 +297,23 @@ class PerformanceMixer:
         actions = self._action_targets(int(sample))
         blink = self._blink.update(now)
 
-        smile = clamp(
-            emotional["smile"] + speech["form"] * 0.45 + actions.get("smile", 0.0) * 1.0,
-            -1.0,
-            1.0,
-        )
+        if self._mouth_backend == "smile":
+            # Alternative mouth channel for models whose vowel params barely
+            # move: keep MouthOpen for the jaw and encode vowel width in
+            # MouthSmile (wide = smile up, round = smile down).
+            smile = clamp(
+                emotional["smile"] * 0.35
+                + speech["form"] * 0.85
+                + actions.get("smile", 0.0),
+                -1.0,
+                1.0,
+            )
+        else:
+            smile = clamp(
+                emotional["smile"] + speech["form"] * 0.45 + actions.get("smile", 0.0) * 1.0,
+                -1.0,
+                1.0,
+            )
         mouth_open = max(speech["open"], emotional["open"], actions.get("open", 0.0))
         if self.state == "thinking":
             mouth_open *= 0.25
@@ -366,7 +378,7 @@ class PerformanceMixer:
                 # lips instead of closing them, so do not drive it here.
                 jaw = 0.0
                 mouth_open = min(mouth_open, 0.035)
-        if self._mouth_backend in ("continuous", "hybrid"):
+        if self._mouth_backend in ("continuous", "hybrid", "smile"):
             params[a.mouth_open] = self._sv(
                 a.mouth_open,
                 mouth_open * mouth_gain,

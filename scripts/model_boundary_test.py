@@ -150,12 +150,32 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
                     }
                 )
             results.sort(key=lambda r: r["diff_min_max"], reverse=True)
+            by_name = {r["name"]: r["diff_min_max"] for r in results}
+            vowels = [by_name.get(n, 0.0) for n in ("VoiceA", "VoiceE", "VoiceI", "VoiceO", "VoiceU")]
+            vowel_score = round(sum(vowels) / max(1, len(vowels)), 2)
+            smile_score = round(by_name.get("MouthSmile", 0.0), 2)
+            open_score = round(by_name.get("MouthOpen", 0.0), 2)
+            strategy = "smile" if smile_score > max(4.0 * vowel_score, 8.0) else "vowel"
+            mouth_strategy = {
+                "strategy": strategy,
+                "vowel_score": vowel_score,
+                "smile_score": smile_score,
+                "mouth_open_score": open_score,
+                "reason": "MouthSmile moves far more than the vowel params"
+                if strategy == "smile"
+                else "vowel params carry the mouth shape",
+            }
+            Path("data/mouth_strategy.json").write_text(
+                json.dumps({"model": model, **mouth_strategy}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
             report = {
                 "model": model,
                 "contract": str(contract_path),
                 "parameter_count": len(results),
                 "moved_count": sum(1 for r in results if r["moved"]),
                 "parameters": results,
+                "mouth_strategy": mouth_strategy,
                 "baseline": str(base) if base else None,
             }
             (out / "results.json").write_text(
@@ -167,6 +187,8 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
                 f"- modelID：{model.get('modelID')}",
                 f"- 参数总数：{report['parameter_count']}",
                 f"- 真正会动的：{report['moved_count']}",
+                "",
+                f"- 口型通道建议：{strategy}（元音 {vowel_score} / smile {smile_score} / 开合 {open_score}）",
                 "",
                 "## 影响最大的参数",
                 "",
