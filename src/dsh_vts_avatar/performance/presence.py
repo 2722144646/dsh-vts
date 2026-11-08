@@ -273,13 +273,23 @@ class PresenceDirector:
         intensity = candidates[kind].get("i") or 0.45 + 0.35 * min(1.0, self.profile.energy)
         return kind, round(min(1.2, max(0.1, intensity)), 3)
 
-    def next_cue(self, now: float, *, speaking: bool) -> tuple[str, float] | None:
+    def next_cue(
+        self, now: float, *, speaking: bool, silence_s: float = 0.0
+    ) -> tuple[str, float] | None:
         """Return (kind, intensity) when it is time for an idle cue."""
         if speaking:
             return None
         if now < self._next_at:
             return None
-        self._next_at = now + self.rng.uniform(MIN_GAP, MAX_GAP)
+        self._next_at = now + next_gap(silence_s, self.rng)
+        if silence_s >= 300 and self.rng.random() < 0.4:
+            # After a long silence she looks over once in a while instead of
+            # fidgeting in place.
+            pool = self._pool()
+            for kind in ("idle_look_user", "idle_glance"):
+                if kind in pool and kind not in self._last[-2:]:
+                    self._last = (self._last + [kind])[-4:]
+                    return kind, round(float(pool[kind].get("i", 0.5)), 3)
         return self._pick(now)
 
 
