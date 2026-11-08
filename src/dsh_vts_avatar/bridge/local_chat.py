@@ -53,7 +53,7 @@ class LocalChat:
             "messages": messages,
             "stream": False,
             "think": False,
-            "options": {"temperature": 0.8, "num_predict": 260},
+            "options": {"temperature": 0.8, "num_predict": 140},
         }
         data = await asyncio.to_thread(self._post, payload)
         message = data.get("message") or {}

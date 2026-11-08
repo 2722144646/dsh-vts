@@ -819,7 +819,7 @@ export function apply(ctx, config = {}) {
         async execute(args) {
           const result = await client.request('local.chat', {
             text: String(args?.text ?? ''),
-          });
+          }, 180000);
           return { ...result, ok: result?.ok !== false };
         },
       }),
