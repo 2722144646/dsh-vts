@@ -234,8 +234,9 @@ class PresenceDirector:
         if self.profile.key != previous:
             self._next_at = 0.0
             if self.generated_at > 0 or self.library:
-                self.needs_write = True
-                self.write_reason = "profile_change"
+                if not self.needs_write or self.write_reason == "profile_change":
+                    self.needs_write = True
+                    self.write_reason = "profile_change"
         return self.profile
 
     def _pool(self) -> dict[str, dict[str, float]]:
