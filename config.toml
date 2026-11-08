@@ -155,6 +155,8 @@ port = 8765
 # generated locally and spoken directly; the text never leaves this machine.
 enabled = true
 endpoint = "http://127.0.0.1:11434"
+backend = "ollama"
+api_key = ""
 model = "huihui_ai/qwen3-abliterated:8b"
 timeout_s = 180
 history_turns = 8
