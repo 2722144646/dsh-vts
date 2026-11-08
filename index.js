@@ -111,6 +111,13 @@ class BridgeClient {
           clearTimeout(pending.timer);
           pending.resolve(message);
         }
+      } else if (message.type === 'relationship.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
       } else if (message.type === 'diary.write.result') {
         const pending = this.pending.get(message.request_id);
         if (pending) {
@@ -691,6 +698,45 @@ export function apply(ctx, config = {}) {
         },
         async execute(args) {
           const result = await client.request('diary.write', { text: String(args?.text ?? '') });
+          return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_relationship',
+        description:
+          'Record one relationship event you judge as real: promise kept/broken, boundary crossed, ' +
+          'apology accepted/rejected, vulnerability shared, comfort seeking, distance requested, ' +
+          'respectful refusal, conflict or reconcile. Trust/closeness/friction move slowly; the ' +
+          'impression (not the numbers) is what reaches the prompt.',
+        parameters: {
+          type: 'object',
+          properties: {
+            event: {
+              type: 'string',
+              enum: [
+                'promise_kept', 'promise_broken', 'apology_accepted', 'apology_rejected',
+                'vulnerability_shared', 'boundary_crossed', 'noticed_absence', 'conflict',
+                'reconcile', 'comfort_seek', 'distance_requested', 'respect_refusal',
+              ],
+            },
+            note: { type: 'string', description: 'One short sentence.' },
+          },
+          required: ['event'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value?.ok ? `关系记录：${value?.event}` : `没记成：${value?.error ?? ''}`,
+          }],
+        },
+        async execute(args) {
+          const result = await client.request('relationship.event', {
+            event: String(args?.event ?? ''),
+            note: String(args?.note ?? ''),
+          });
           return { ...result, ok: result?.ok !== false };
         },
       }),
