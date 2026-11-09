@@ -54,3 +54,5 @@ START_HERE.md
 analyze_obs.py
 freeform_analyze.py
 freeform_candidates.py
+# Local config -- each user has their own
+config.toml
