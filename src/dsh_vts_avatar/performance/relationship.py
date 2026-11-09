@@ -34,6 +34,10 @@ DELTAS: dict[str, dict[str, float]] = {
     "comfort_seek": {"dependency": 0.05, "closeness": 0.02},
     "distance_requested": {"dependency": -0.08},
     "respect_refusal": {"trust": 0.02},
+    # Pushing an intimate topic before the relationship allows it is a boundary
+    # crossing, not a charm offensive: trust drops and friction rises.
+    "intimacy_forced": {"trust": -0.12, "friction": 0.18},
+    "intimacy_allowed": {"closeness": 0.05, "trust": 0.02},
 }
 
 # Slow decay: trust/closeness per week, friction per ~1.5 days, dependency per week.
@@ -141,6 +145,39 @@ class RelationshipStore:
         if s.closeness >= 0.35:
             return "和他聊得还算近，偶尔可以开点玩笑。"
         return ""
+
+    def style(self) -> str:
+        """How to talk right now, derived from trust / dependency / friction.
+
+        This is the part that actually changes wording. ``impression`` only says
+        how it feels; without this the relationship never reaches the mouth.
+        """
+        s = self.state
+        bits: list[str] = []
+        if s.friction >= 0.5:
+            bits.append("话短、冷淡，不主动延展话题")
+        elif s.friction >= 0.25:
+            bits.append("话少一点，先不开玩笑")
+        if s.trust <= 0.3:
+            bits.append("客气，不用亲昵的称呼，不追问私事")
+        elif s.trust >= 0.75 and s.closeness >= 0.4:
+            bits.append("随意，想说什么直接说，开玩笑也可以")
+        elif s.closeness >= 0.35:
+            bits.append("可以放松一点，偶尔打趣")
+        if s.dependency >= 0.7:
+            bits.append("更主动找话，会在意对方还在不在")
+        if not bits:
+            return ""
+        return "说话方式：" + "；".join(bits) + "。"
+
+    def intimacy_allowed(self) -> bool:
+        """Whether an intimate topic is within the current relationship.
+
+        The scale itself is left to the local model; this only decides whether
+        the door is open. Forcing it while closed is ``intimacy_forced``.
+        """
+        s = self.state
+        return s.trust >= 0.6 and s.closeness >= 0.5 and s.friction < 0.3
 
 
 def _clamp(value: float) -> float:

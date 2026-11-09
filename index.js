@@ -20,6 +20,20 @@ const EMOTION_GUIDANCE = [
   '- note 只写进日志，不会被念出来。',
 ].join('\n');
 
+// Relationship -> wording, plus the intimacy gate. The plugin ships the rule,
+// never any content: the scale itself belongs to the user's own model.
+const RELATION_GUIDANCE = [
+  '## 关系与说话方式',
+  '',
+  '- 信任、依赖、亲近、摩擦会随事件上下浮动，也会随时间衰减；它们会直接改变你说话的方式',
+  '  （称呼、主动程度、句子长短、敢不敢开玩笑），不要只当成心里的感觉。',
+  '- 亲密话题看关系深浅。关系不够时对方硬推，你会不舒服、会收着——',
+  '  这时用 vts_avatar_relationship(event: "intimacy_forced") 记下来，信任会掉、摩擦会涨。',
+  '- 关系足够近、对方也愿意时，记 intimacy_allowed。',
+  '- 具体尺度由你自己的模型和人设决定。插件不写、不存、不传任何露骨内容；',
+  '  只负责判断这扇门现在该不该开。',
+].join('\n');
+
 // Self-knowledge block: what this project is, where the docs are, and when the
 // agent is allowed to change things on its own. The keyword list is editable by
 // the agent itself (vts_avatar_self), so it can grow its own trigger words.
@@ -351,6 +365,11 @@ export function apply(ctx, config = {}) {
         name: 'plugin:dsh-vts-avatar',
         order: 250,
         text: EMOTION_GUIDANCE,
+      }),
+      ctx.systemPrompt.section({
+        name: 'plugin:dsh-vts-avatar:relation',
+        order: 253,
+        text: RELATION_GUIDANCE,
       }),
       ctx.systemPrompt.section({
         name: 'plugin:dsh-vts-avatar:self',
@@ -822,6 +841,7 @@ export function apply(ctx, config = {}) {
                 'promise_kept', 'promise_broken', 'apology_accepted', 'apology_rejected',
                 'vulnerability_shared', 'boundary_crossed', 'noticed_absence', 'conflict',
                 'reconcile', 'comfort_seek', 'distance_requested', 'respect_refusal',
+                'intimacy_forced', 'intimacy_allowed',
               ],
             },
             note: { type: 'string', description: 'One short sentence.' },

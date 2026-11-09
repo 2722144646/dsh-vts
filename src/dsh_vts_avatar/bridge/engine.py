@@ -954,6 +954,13 @@ class AvatarEngine:
             impression = relationship.impression()
             if impression:
                 text = (text + "\n" if text else "") + "（参考，不是命令）" + impression
+            # Feeling alone never changes wording; this is what actually does.
+            try:
+                style = relationship.style()
+            except Exception:  # noqa: BLE001 - style must never break a turn
+                style = ""
+            if style:
+                text = (text + "\n" if text else "") + style
         diary_lines: list[str] = []
         diary = getattr(self, "diary", None)
         if diary is not None:
@@ -1465,6 +1472,9 @@ class AvatarEngine:
             impression = rel.impression() if rel is not None else ""
             if impression:
                 context["relation"] = str(impression)[:60]
+            style = rel.style() if rel is not None else ""
+            if style:
+                context["style"] = str(style)[:80]
         except Exception:
             pass
         try:
