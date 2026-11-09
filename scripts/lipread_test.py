@@ -225,14 +225,11 @@ async def run(out: pathlib.Path, url: str) -> dict[str, Any]:
                         dst = frames / f"{scheme}_{vowel}_{repeat}.jpg"
                         shutil.copyfile(src, dst)
                         img = cv2.imdecode(np.fromfile(str(dst), dtype=np.uint8), cv2.IMREAD_COLOR)
-                        if box is None:
-                            box = find_mouth_box(img)
-                            report["mouth_box"] = [int(v) for v in box]
-                        passes[vowel].append(crop_with_box(img, box))
+                        passes[vowel].append(mouth_crop(img))
                 for vowel, shots in passes.items():
                     if not shots:
                         continue
-                    if not crops:
+                    if reference is None:
                         reference = shots[0]
                     aligned = [align_to(reference, shot) for shot in shots]
                     stack = np.stack(aligned, axis=0)
