@@ -108,9 +108,18 @@ class Bridge:
         task = asyncio.create_task(pump())
         try:
             await asyncio.sleep(seconds)
-            reply = await self.call({"type": "snapshot", "frames": 1}, "snapshot.result")
-            path = (reply.get("metrics") or {}).get("path")
-            return pathlib.Path(path) if path else None
+            path: pathlib.Path | None = None
+            # A timed-out NDI capture still answers with the previous file, so
+            # require the file to be newer than it was before the request.
+            for _attempt in range(4):
+                before = path.stat().st_mtime_ns if path and path.exists() else 0
+                reply = await self.call({"type": "snapshot", "frames": 1}, "snapshot.result")
+                raw = (reply.get("metrics") or {}).get("path")
+                path = pathlib.Path(raw) if raw else None
+                if path and path.exists() and path.stat().st_mtime_ns > before:
+                    return path
+                await asyncio.sleep(0.15)
+            return path
         finally:
             task.cancel()
             try:
@@ -193,6 +202,53 @@ def align_to(ref, img):
     )
 
 
+class MouthTracker:
+    """Follow the mouth across frames instead of re-detecting it blindly.
+
+    Re-detecting eyes on every frame is not stable: on models with headgear the
+    blob pairing jumps to decorations and the crop lands somewhere else entirely
+    (measured: consecutive frames of the same pose picked boxes at 129 vs 610).
+    The tracker detects once, then follows the mouth by template matching, so
+    the crop moves with the head and still cannot teleport.
+    """
+
+    def __init__(self, img):
+        self.box = find_mouth_box(img)
+        self.template = crop_with_box(img, self.box)
+        self.misses = 0
+
+    def update(self, img):
+        top, bottom, left, right = self.box
+        pad_y = max(12, (bottom - top) // 2)
+        pad_x = max(12, (right - left) // 2)
+        h, w = img.shape[:2]
+        y0, y1 = max(0, top - pad_y), min(h, bottom + pad_y)
+        x0, x1 = max(0, left - pad_x), min(w, right + pad_x)
+        window = img[y0:y1, x0:x1]
+        new_box = self.box
+        if window.size and window.shape[0] >= self.template.shape[0] and window.shape[1] >= self.template.shape[1]:
+            result = cv2.matchTemplate(window, self.template, cv2.TM_CCOEFF_NORMED)
+            _min, max_val, _minloc, maxloc = cv2.minMaxLoc(result)
+            if max_val >= 0.6:
+                dx, dy = maxloc[0] - pad_x, maxloc[1] - pad_y
+                new_box = (top + dy, bottom + dy, left + dx, right + dx)
+                self.misses = 0
+            else:
+                self.misses += 1
+        else:
+            self.misses += 1
+        if self.misses >= 3:
+            # Lost it: re-detect and restart tracking from the new position.
+            self.box = find_mouth_box(img)
+            self.template = crop_with_box(img, self.box)
+            self.misses = 0
+        else:
+            self.box = new_box
+        crop = crop_with_box(img, self.box)
+        self.template = crop
+        return crop
+
+
 def pairwise(diffs: dict[str, float]) -> dict[str, str]:
     out = {}
     for key, value in diffs.items():
@@ -205,8 +261,7 @@ async def run(out: pathlib.Path, url: str) -> dict[str, Any]:
     frames = out / "frames"
     frames.mkdir(exist_ok=True)
     report: dict[str, Any] = {"channels": {}}
-    box = None
-    reference = None
+    tracker = None
     async with Bridge(url) as bridge:
         await bridge.call({"type": "inject.pause", "paused": True}, "inject.pause.result")
         try:
@@ -225,18 +280,22 @@ async def run(out: pathlib.Path, url: str) -> dict[str, Any]:
                         dst = frames / f"{scheme}_{vowel}_{repeat}.jpg"
                         shutil.copyfile(src, dst)
                         img = cv2.imdecode(np.fromfile(str(dst), dtype=np.uint8), cv2.IMREAD_COLOR)
-                        passes[vowel].append(mouth_crop(img))
+                        # One tracker for the whole run: it follows the head so the
+                        # crop stays on the mouth, and every crop has the same size.
+                        if tracker is None:
+                            tracker = MouthTracker(img)
+                            crop = tracker.template
+                        else:
+                            crop = tracker.update(img)
+                        passes[vowel].append(crop)
                 for vowel, shots in passes.items():
                     if not shots:
                         continue
-                    if reference is None:
-                        reference = shots[0]
-                    aligned = [align_to(reference, shot) for shot in shots]
-                    stack = np.stack(aligned, axis=0)
+                    stack = np.stack(shots, axis=0)
                     crops[vowel] = np.median(stack, axis=0).astype(np.uint8)
-                    if len(aligned) > 1:
-                        g1 = cv2.cvtColor(aligned[0], cv2.COLOR_BGR2GRAY)
-                        g2 = cv2.cvtColor(aligned[1], cv2.COLOR_BGR2GRAY)
+                    if len(shots) > 1:
+                        g1 = cv2.cvtColor(shots[0], cv2.COLOR_BGR2GRAY)
+                        g2 = cv2.cvtColor(shots[1], cv2.COLOR_BGR2GRAY)
                         noise[vowel] = round(float(np.mean(cv2.absdiff(g1, g2))), 2)
                 diffs = {}
                 for i in range(len(VOWELS)):
