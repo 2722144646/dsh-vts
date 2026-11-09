@@ -17,10 +17,9 @@ from typing import Any
 
 DEFAULT_KEYWORDS = ["无法实现", "隐私", "模型边界", "模型的边界"]
 DEFAULT_DOCS = [
-    "E:\\dsh-vts-avatar\\计划总览.md",
-    "E:\\dsh-vts-avatar\\用户原话与共识.md",
-    "E:\\dsh-vts-avatar\\项目总计划.md",
-    "E:\\dsh-vts-avatar\\模型边界测试计划.md",
+    "README.md",
+    "docs/用户手册.md",
+    "docs/功能说明.md",
 ]
 PROJECT_BRIEF = (
     "这是一个数字人项目：DSH 插件 + Python 桥接，在 VTube Studio 上驱动 Live2D 模型说话、"

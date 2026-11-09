@@ -47,7 +47,7 @@ const SELF_GUIDANCE = (info) => {
       || '数字人项目：DSH 插件 + Python 桥接，驱动 VTube Studio 里的 Live2D 模型说话、带表情、待机。',
     '',
     '项目文档（需要细节时自己读，别靠猜）：',
-    docs || '- E:\\dsh-vts-avatar\\计划总览.md',
+    docs || '- README.md',
     '',
     `碰到这些词，说明触及了项目的边界或缺口：${keywords}`,
     '',

@@ -47,3 +47,10 @@ tmp-*/
 node_modules/
 pnpm-lock.yaml
 dist/
+# Personal / local state -- never uploaded
+data/
+HANDOFF.md
+START_HERE.md
+analyze_obs.py
+freeform_analyze.py
+freeform_candidates.py
