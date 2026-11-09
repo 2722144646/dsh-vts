@@ -20,6 +20,32 @@ const EMOTION_GUIDANCE = [
   '- note 只写进日志，不会被念出来。',
 ].join('\n');
 
+// Self-knowledge block: what this project is, where the docs are, and when the
+// agent is allowed to change things on its own. The keyword list is editable by
+// the agent itself (vts_avatar_self), so it can grow its own trigger words.
+const SELF_GUIDANCE = (info) => {
+  const keywords = (info?.keywords?.length ? info.keywords : ['无法实现', '隐私', '模型边界', '模型的边界']).join('、');
+  const docs = (info?.docs?.length ? info.docs : []).map((d) => `- ${d}`).join('\n');
+  return [
+    '## 这个项目是什么（自述）',
+    '',
+    info?.project
+      || '数字人项目：DSH 插件 + Python 桥接，驱动 VTube Studio 里的 Live2D 模型说话、带表情、待机。',
+    '',
+    '项目文档（需要细节时自己读，别靠猜）：',
+    docs || '- E:\\dsh-vts-avatar\\计划总览.md',
+    '',
+    `碰到这些词，说明触及了项目的边界或缺口：${keywords}`,
+    '',
+    '规则：',
+    '- 遇到「无法理解 / 无法解析 / 缺失」的部分，说明现有实现或文档没覆盖；**可以直接改**，不用等确认。',
+    '- 改完把做法写进对应计划文档，不要只在对话里说。',
+    '- 你可以用 vts_avatar_self 增加自己的触发关键词（action: "keyword_add"）。',
+    '- 你也可以用 vts_avatar_self 记私人笔记（action: "note"）：只存在本机 data/ai/self.json，',
+    '  不上传、不进公开仓库、不写进发布说明。',
+  ].join('\n');
+};
+
 export const inject = ['tools', 'systemPrompt'];
 
 function sessionIdOf(agent) {
@@ -43,6 +69,7 @@ class BridgeClient {
     this.pending = new Map();
     this.nextRequest = 1;
     this.mood = null;
+    this.selfInfo = null;
   }
 
   start() {
@@ -80,6 +107,7 @@ class BridgeClient {
         this.lastStatus = message.status ?? message;
         console.info('[vts-avatar] bridge ready:', JSON.stringify(this.lastStatus));
         this.request('mood.get').catch(() => {});
+        this.request('self.get').catch(() => {});
       } else if (message.type === 'mood.result') {
         this.setMood(message.text);
         const pending = this.pending.get(message.request_id);
@@ -161,6 +189,14 @@ class BridgeClient {
           pending.resolve(message);
         }
       } else if (message.type === 'feel.result') {
+        const pending = this.pending.get(message.request_id);
+        if (pending) {
+          this.pending.delete(message.request_id);
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+        }
+      } else if (message.type && message.type.startsWith('self.') && message.type.endsWith('.result')) {
+        if (message.self) this.selfInfo = message.self;
         const pending = this.pending.get(message.request_id);
         if (pending) {
           this.pending.delete(message.request_id);
@@ -315,6 +351,11 @@ export function apply(ctx, config = {}) {
         name: 'plugin:dsh-vts-avatar',
         order: 250,
         text: EMOTION_GUIDANCE,
+      }),
+      ctx.systemPrompt.section({
+        name: 'plugin:dsh-vts-avatar:self',
+        order: 251,
+        text: () => SELF_GUIDANCE(client.selfInfo),
       }),
       ctx.tools.register({
         name: 'vts_avatar_look',
@@ -727,6 +768,41 @@ export function apply(ctx, config = {}) {
         async execute(args) {
           const result = await client.request('diary.write', { text: String(args?.text ?? '') });
           return { ...result, ok: result?.ok !== false };
+        },
+      }),
+
+      ctx.tools.register({
+        name: 'vts_avatar_self',
+        description:
+          'Read or extend your own project self-knowledge: the project brief, where its plan docs live, ' +
+          'and the trigger keywords that mean "this is a boundary or a gap". ' +
+          'action=list returns the current state; keyword_add / keyword_remove edit your own trigger words; ' +
+          'note stores a private note that stays on this machine (data/ai/self.json) and is never uploaded.',
+        parameters: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['list', 'keyword_add', 'keyword_remove', 'note'] },
+            word: { type: 'string', description: 'Trigger keyword for keyword_add / keyword_remove.' },
+            text: { type: 'string', description: 'Private note body for action=note.' },
+          },
+          required: ['action'],
+          additionalProperties: false,
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_args, value) => [{
+            type: 'text',
+            text: value && value.keywords
+              ? `关键词：${value.keywords.join('、')}；笔记 ${value.note_count ?? 0} 条`
+              : `没读到自己：${value?.error ?? ''}`,
+          }],
+        },
+        async execute(args) {
+          const action = String(args?.action ?? 'list');
+          if (action === 'keyword_add') return client.request('self.keyword.add', { word: String(args?.word ?? '') });
+          if (action === 'keyword_remove') return client.request('self.keyword.remove', { word: String(args?.word ?? '') });
+          if (action === 'note') return client.request('self.note.add', { text: String(args?.text ?? '') });
+          return client.request('self.get');
         },
       }),
 

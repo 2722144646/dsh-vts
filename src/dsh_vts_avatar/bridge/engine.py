@@ -17,6 +17,7 @@ import numpy as np
 
 from ..audio.engine import Clock, make_clock
 from ..config import Config
+from ..ai_self import SelfKnowledge
 from ..ndi.capture import NDICapture
 from ..performance import PerformanceMixer, strip_emotion_tags
 from ..performance.affect import AffectEvidence, AffectFusion, AffectLog, AffectState
@@ -93,6 +94,9 @@ class AvatarEngine:
         self.relationship = RelationshipStore(config.root / "data")
         self.privacy = PrivacyStore(config.root / "data")
         self.diary = DiaryStore(config.root / "data")
+        # Self-knowledge: what this project is, where the docs live, the trigger
+        # words the agent may act on by itself, and a private note pad.
+        self.self_knowledge = SelfKnowledge(config.root / "data" / "ai" / "self.json")
         self.user_id = "default"
         self.display_name = "default"
         self._last_voice_at = 0.0
@@ -103,6 +107,24 @@ class AvatarEngine:
         self.local_chat = LocalChat(config.llm)
         self.director = LocalDirector(config.llm) if config.llm.director_enabled else None
         self._chat_history: dict[str, deque] = {}
+
+    # -- self knowledge ----------------------------------------------------
+
+    def self_summary(self) -> dict[str, Any]:
+        return self.self_knowledge.summary()
+
+    def self_add_keyword(self, word: str) -> dict[str, Any]:
+        if word:
+            self.self_knowledge.add_keyword(word)
+        return self.self_knowledge.summary()
+
+    def self_remove_keyword(self, word: str) -> dict[str, Any]:
+        self.self_knowledge.remove_keyword(word)
+        return self.self_knowledge.summary()
+
+    def self_add_note(self, text: str) -> dict[str, Any]:
+        self.self_knowledge.add_note(text)
+        return self.self_knowledge.summary()
 
     def switch_user(self, user_id: str, display_name: str = "") -> dict[str, Any]:
         """Switch the active person; every L2/L3 store follows."""

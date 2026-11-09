@@ -186,6 +186,46 @@ class BridgeServer:
             await ws.send(orjson.dumps({"type": "settings.set.result", "request_id": msg.get("request_id"), **result}).decode("utf-8"))
         elif mtype == "diary.folder":
             await ws.send(orjson.dumps({"type": "diary.folder.result", "request_id": msg.get("request_id"), **self.engine.open_diary_folder()}).decode("utf-8"))
+        elif mtype == "self.get":
+            await ws.send(
+                orjson.dumps(
+                    {
+                        "type": "self.get.result",
+                        "request_id": msg.get("request_id"),
+                        "self": self.engine.self_summary(),
+                    }
+                ).decode("utf-8")
+            )
+        elif mtype == "self.keyword.add":
+            await ws.send(
+                orjson.dumps(
+                    {
+                        "type": "self.keyword.add.result",
+                        "request_id": msg.get("request_id"),
+                        "self": self.engine.self_add_keyword(str(msg.get("word") or "")),
+                    }
+                ).decode("utf-8")
+            )
+        elif mtype == "self.keyword.remove":
+            await ws.send(
+                orjson.dumps(
+                    {
+                        "type": "self.keyword.remove.result",
+                        "request_id": msg.get("request_id"),
+                        "self": self.engine.self_remove_keyword(str(msg.get("word") or "")),
+                    }
+                ).decode("utf-8")
+            )
+        elif mtype == "self.note.add":
+            await ws.send(
+                orjson.dumps(
+                    {
+                        "type": "self.note.add.result",
+                        "request_id": msg.get("request_id"),
+                        "self": self.engine.self_add_note(str(msg.get("text") or "")),
+                    }
+                ).decode("utf-8")
+            )
         elif mtype == "idle.request":
             await ws.send(orjson.dumps({"type": "idle.request.result", "request_id": msg.get("request_id"), **self.engine.request_idle_write()}).decode("utf-8"))
         elif mtype == "audio.calibrate":
