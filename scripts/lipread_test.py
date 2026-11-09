@@ -46,11 +46,18 @@ SHAPE = {
 
 def scheme_params(scheme: str, vowel: str) -> dict[str, float]:
     width, roundness, extra = SHAPE[vowel]
-    base: dict[str, float] = {"MouthOpen": 0.55, "FaceAngleX": 0.0, "FaceAngleY": 0.0, "FaceAngleZ": 0.0}
+    base: dict[str, float] = {
+        "MouthOpen": 0.55,
+        "FaceAngleX": 0.0,
+        "FaceAngleY": 0.0,
+        "FaceAngleZ": 0.0,
+        "EyeOpenLeft": 1.0,
+        "EyeOpenRight": 1.0,
+    }
     out = dict(base)
-    if scheme in ("vowel", "all"):
+    if scheme in ("vowel", "hybrid", "all"):
         out[f"Voice{vowel}"] = 1.0
-    if scheme in ("smile", "all"):
+    if scheme in ("smile", "hybrid", "all"):
         out["MouthSmile"] = max(0.0, min(1.0, 0.45 + 0.45 * width))
     if scheme in ("shape", "all"):
         out.update(SHAPE_MAP[vowel])
@@ -114,13 +121,50 @@ class Bridge:
 
 def mouth_crop(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Locate the eyes first: models with tall headgear (Christmas tree, big hats)
+    # break the "top 12-30% of the body box" assumption, and a bbox crop then
+    # measures the hat instead of the mouth.
+    dark = (gray < 70).astype(np.uint8)
+    n, _lab, stats, _cent = cv2.connectedComponentsWithStats(dark, 8)
+    blobs = []
+    for i in range(1, n):
+        x, y, bw, bh, area = stats[i]
+        if area >= 40:
+            blobs.append((area, x + bw // 2, y + bh // 2, bw, bh))
+    blobs.sort(reverse=True)
+    eyes = None
+    for i in range(min(len(blobs), 8)):
+        _a1, cx1, cy1, w1, h1 = blobs[i]
+        if not (8 <= w1 <= 90 and 8 <= h1 <= 90):
+            continue
+        for j in range(i + 1, min(len(blobs), 12)):
+            _a2, cx2, cy2, w2, h2 = blobs[j]
+            if not (8 <= w2 <= 90 and 8 <= h2 <= 90):
+                continue
+            if abs(cy1 - cy2) < 40 and 20 < abs(cx1 - cx2) < 300:
+                eyes = ((cx1, cy1), (cx2, cy2))
+                break
+        if eyes:
+            break
+    h, w = gray.shape
+    if eyes:
+        (x1, y1), (x2, y2) = eyes
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        d = abs(x1 - x2)
+        half = max(30, d // 2)
+        top = cy + int(d * 0.22)
+        bottom = cy + int(d * 0.72)
+        crop = img[top:bottom, max(0, cx - half) : cx + half]
+        if crop.size:
+            return cv2.resize(crop, (420, 300))
     ys, xs = np.where((gray < 235).astype(np.uint8) > 0)
-    if len(xs) == 0:
-        h, w = img.shape[:2]
-        return img[h // 3 : h // 2, w // 3 : 2 * w // 3]
-    x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
-    w, h, cx = x1 - x0, y1 - y0, (x0 + x1) // 2
-    return img[y0 + int(h * 0.12) : y0 + int(h * 0.30), cx - int(w * 0.16) : cx + int(w * 0.16)]
+    if len(xs):
+        x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+        cw, ch, ccx = x1 - x0, y1 - y0, (x0 + x1) // 2
+        crop = img[y0 + int(ch * 0.12) : y0 + int(ch * 0.30), ccx - int(cw * 0.16) : ccx + int(cw * 0.16)]
+        if crop.size:
+            return cv2.resize(crop, (420, 300))
+    return cv2.resize(img[h // 3 : h // 2, w // 3 : 2 * w // 3], (420, 300))
 
 
 def pairwise(diffs: dict[str, float]) -> dict[str, str]:
@@ -138,7 +182,7 @@ async def run(out: pathlib.Path, url: str) -> dict[str, Any]:
     async with Bridge(url) as bridge:
         await bridge.call({"type": "inject.pause", "paused": True}, "inject.pause.result")
         try:
-            for scheme in ("vowel", "smile", "vb", "shape", "all"):
+            for scheme in ("vowel", "smile", "vb", "shape", "hybrid", "all"):
                 crops = {}
                 for vowel in VOWELS:
                     src = await bridge.hold(scheme_params(scheme, vowel))
@@ -182,9 +226,25 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="data/lipread")
     parser.add_argument("--url", default="ws://127.0.0.1:8765")
+    parser.add_argument("--model-id", default="", help="write this model's mouth strategy from readability")
+    parser.add_argument("--model-name", default="")
+    parser.add_argument("--profile-dir", default="data/profiles")
+    parser.add_argument("--root", default=".")
     args = parser.parse_args()
     report = asyncio.run(run(pathlib.Path(args.out), args.url))
     print(json.dumps({k: (v["mean"], v["unreadable_pairs"]) for k, v in report["channels"].items()}, ensure_ascii=False))
+    if args.model_id:
+        from dsh_vts_avatar.performance.mouth_strategy import classify, save_strategy
+
+        means = {
+            name: report["channels"][name]["mean"]
+            for name in ("shape", "vowel", "hybrid", "smile")
+            if name in report["channels"]
+        }
+        data = classify(means)
+        data["model"] = {"modelName": args.model_name, "modelID": args.model_id}
+        save_strategy(pathlib.Path(args.profile_dir), pathlib.Path(args.root), args.model_id, data)
+        print("strategy:", data["strategy"], data["scores"])
 
 
 if __name__ == "__main__":

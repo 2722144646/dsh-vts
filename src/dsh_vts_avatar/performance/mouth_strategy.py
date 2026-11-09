@@ -1,54 +1,42 @@
-"""Choose the mouth channel that fits a model, from boundary-test scores."""
+"""Choose the mouth channel for a model from lip-readability measurements.
+
+One ruler only: how well the five vowels stay distinguishable (pairwise mouth
+ROI difference in the fixed-head test). Deformation size from the boundary
+test is NOT used for ranking; it only proves a parameter is alive.
+"""
 
 from __future__ import annotations
 
 import json
 
-VOWEL_MIN = 1.5
-SMILE_MIN = 6.0
-OPEN_MIN = 3.0
-SHAPE_MIN = 10.0
+READ_MIN = 10.0
+ORDER = ("shape", "vowel", "hybrid", "smile", "continuous")
 
 
-def classify(vowel_score: float, smile_score: float, open_score: float, shape_score: float = 0.0) -> dict:
-    """Pick vowel / smile / hybrid / continuous from measured visual impact.
+def classify(scores: dict[str, float], *, open_ok: bool = True) -> dict:
+    """Pick the channel with the highest readability mean.
 
-    - vowel params (VoiceA/I/U/E/O) carry the shape when they move;
-    - MouthSmile adds width when it moves;
-    - both moving -> hybrid (vowel carries identity, smile adds width);
-    - only MouthOpen -> continuous (open/close only);
-    - nothing -> none.
+    scores: channel -> mean pairwise vowel difference (>= READ_MIN means usable).
+    open_ok: whether MouthOpen itself moves at all (fallback only).
     """
-    vowel_ok = float(vowel_score) >= VOWEL_MIN
-    smile_ok = float(smile_score) >= SMILE_MIN
-    open_ok = float(open_score) >= OPEN_MIN
-    if float(shape_score) >= SHAPE_MIN:
-        strategy = "shape"
-    elif vowel_ok and smile_ok:
-        strategy = "hybrid"
-    elif smile_ok:
-        strategy = "smile"
-    elif vowel_ok:
-        strategy = "vowel"
+    measured = {k: float(v) for k, v in scores.items() if k in ORDER and k != "continuous"}
+    usable = {k: v for k, v in measured.items() if v >= READ_MIN}
+    if usable:
+        strategy = max(usable, key=usable.get)
     elif open_ok:
         strategy = "continuous"
     else:
         strategy = "none"
-    channels = []
-    if vowel_ok:
-        channels.append("vowel")
-    if smile_ok:
-        channels.append("smile")
-    if open_ok:
-        channels.append("mouth_open")
     return {
         "strategy": strategy,
-        "channels": channels,
-        "vowel_score": round(float(vowel_score), 2),
-        "smile_score": round(float(smile_score), 2),
-        "mouth_open_score": round(float(open_score), 2),
-        "shape_score": round(float(shape_score), 2),
-        "thresholds": {"shape": SHAPE_MIN, "vowel": VOWEL_MIN, "smile": SMILE_MIN, "mouth_open": OPEN_MIN},
+        "scores": {k: round(v, 2) for k, v in measured.items()},
+        "threshold": READ_MIN,
+        "usable": sorted(usable),
+        "reason": (
+            f"{strategy} has the highest lip-readability mean"
+            if strategy in usable
+            else "no channel reaches the readability threshold"
+        ),
     }
 
 

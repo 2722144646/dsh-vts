@@ -152,26 +152,20 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
             results.sort(key=lambda r: r["diff_min_max"], reverse=True)
             by_name = {r["name"]: r["diff_min_max"] for r in results}
             vowels = [by_name.get(n, 0.0) for n in ("VoiceA", "VoiceE", "VoiceI", "VoiceO", "VoiceU")]
+            # Ranking now comes from lip-readability (lipread_test.py).
+            # Boundary only proves a parameter is alive, never decides priority.
             vowel_score = round(sum(vowels) / max(1, len(vowels)), 2)
             smile_score = round(by_name.get("MouthSmile", 0.0), 2)
             open_score = round(by_name.get("MouthOpen", 0.0), 2)
-            from dsh_vts_avatar.performance.mouth_strategy import classify
-
-            mouth_strategy = classify(vowel_score, smile_score, open_score)
-            strategy = mouth_strategy["strategy"]
-            mouth_strategy["reason"] = (
-                "vowel + smile both move: use both"
-                if strategy == "hybrid"
-                else "only one channel moves enough for lip shape"
-            )
-            from dsh_vts_avatar.performance.mouth_strategy import save_strategy
-
-            save_strategy(
-                pathlib.Path("data/profiles"),
-                pathlib.Path("."),
-                str(model.get("modelID") or "unknown"),
-                {"model": model, **mouth_strategy},
-            )
+            mouth_strategy = {
+                "impact": {
+                    "vowel": vowel_score,
+                    "smile": smile_score,
+                    "mouth_open": open_score,
+                },
+                "note": "impact only; mouth channel is chosen from lipread_test.py",
+            }
+            strategy = "see-lipread"
             report = {
                 "model": model,
                 "contract": str(contract_path),
@@ -191,7 +185,7 @@ async def run(contract_path: pathlib.Path, out: pathlib.Path, url: str) -> dict[
                 f"- 参数总数：{report['parameter_count']}",
                 f"- 真正会动的：{report['moved_count']}",
                 "",
-                f"- 口型通道建议：{strategy}（元音 {vowel_score} / smile {smile_score} / 开合 {open_score}）",
+                f"- 视觉影响（仅证明参数活着，不决定通道）：元音 {vowel_score} / smile {smile_score} / 开合 {open_score}",
                 "",
                 "## 影响最大的参数",
                 "",
