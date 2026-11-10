@@ -32,6 +32,17 @@ def clamp(value: float, low: float, high: float) -> float:
 # targets instead of holding a single shape. Values are (start, end) vowel
 # phones; the shape crossfades over the second half of the segment.
 SHAPE_SMILE = {"A": 0.10, "I": 0.80, "U": 0.05, "E": 0.55, "O": 0.10}
+
+#: The model's neutral MouthSmile input. Anything above/below is expression.
+NEUTRAL_SMILE = 0.50
+#: While she is talking, the face yields the mouth: emotion keeps only this
+#: share of its excursion, so a smile no longer widens every vowel.
+MOUTH_DUCK = 0.25
+
+
+def duck_smile(value: float, duck: float) -> float:
+    """Shrink an expression around the neutral input instead of around zero."""
+    return NEUTRAL_SMILE + (float(value) - NEUTRAL_SMILE) * duck
 SHAPE_X = {"A": 0.0, "I": 0.15, "U": -0.30, "E": 0.0, "O": 0.30}
 DIPHTHONGS: dict[str, tuple[str, str]] = {
     "ai": ("a", "i"),
@@ -164,6 +175,16 @@ class PerformanceMixer:
             # Idle motions yield the moment she starts talking; they must not
             # keep driving the mouth or neck under the speech timeline.
             self.actions = [cue for cue in self.actions if not cue.kind.startswith("idle_")]
+
+    def _duck_factor(self, speech_open: float) -> float:
+        """How much of the expression survives while the mouth is busy.
+
+        The mouth belongs to the speech layer: idle expressions yield instead of
+        widening or propping open the vowels being spoken.
+        """
+        if self.state == "speaking" or float(speech_open) > 0.02:
+            return MOUTH_DUCK
+        return 1.0
 
     def set_profile(self, profile: ModelProfile | None, backend: str | None = None) -> None:
         self.profile = profile
@@ -299,10 +320,18 @@ class PerformanceMixer:
         actions = self._action_targets(int(sample))
         blink = self._blink.update(now)
 
+        # The mouth belongs to the speech layer. While talking, a smile or an
+        # open-mouthed expression keeps only a quarter of its excursion, so it
+        # cannot widen or prop open the vowels being spoken. It comes back the
+        # moment the utterance ends.
+        duck = self._duck_factor(speech["open"])
+        expr_smile = duck_smile(emotional["smile"], duck)
+        expr_open = emotional["open"] * duck
+
         if self._mouth_backend == "shape":
             base = SHAPE_SMILE.get(segment.viseme or "", 0.45)
             smile = clamp(
-                base + emotional["smile"] * 0.20 + actions.get("smile", 0.0) * 0.30,
+                base + expr_smile * 0.20 + actions.get("smile", 0.0) * 0.30,
                 -1.0,
                 1.0,
             )
@@ -310,7 +339,7 @@ class PerformanceMixer:
             # Both channels work: vowel params carry identity, MouthSmile adds
             # a visible width change so wide/round vowels read at a distance.
             smile = clamp(
-                emotional["smile"] * 0.55
+                expr_smile * 0.55
                 + speech["form"] * 0.75
                 + actions.get("smile", 0.0),
                 -1.0,
@@ -318,17 +347,17 @@ class PerformanceMixer:
             )
         elif self._mouth_backend == "smile":
             smile = clamp(
-                emotional["smile"] * 0.35 + speech["form"] * 0.85 + actions.get("smile", 0.0),
+                expr_smile * 0.35 + speech["form"] * 0.85 + actions.get("smile", 0.0),
                 -1.0,
                 1.0,
             )
         else:
             smile = clamp(
-                emotional["smile"] + speech["form"] * 0.45 + actions.get("smile", 0.0) * 1.0,
+                expr_smile + speech["form"] * 0.45 + actions.get("smile", 0.0) * 1.0,
                 -1.0,
                 1.0,
             )
-        mouth_open = max(speech["open"], emotional["open"], actions.get("open", 0.0))
+        mouth_open = max(speech["open"], expr_open, actions.get("open", 0.0))
         if self.state == "thinking":
             mouth_open *= 0.25
         voice = speech["voice"]
@@ -357,7 +386,12 @@ class PerformanceMixer:
             heads["x"] += mapping.get("FaceAngleX", 0.0) * mapping_strength
             heads["y"] += mapping.get("FaceAngleY", 0.0) * mapping_strength
             heads["z"] += mapping.get("FaceAngleZ", 0.0) * mapping_strength
-            mouth_open = max(mouth_open, mapping.get("MouthOpen", 0.0) * mapping_strength)
+            # Same rule as above: a surprised face may open the mouth at rest,
+            # but it must not prop it open under the vowels being spoken.
+            mouth_open = max(
+                mouth_open,
+                mapping.get("MouthOpen", 0.0) * mapping_strength * duck,
+            )
         head_x = heads["x"] + actions.get("yaw", 0.0) * head_gain
         head_y = heads["y"] + actions.get("pitch", 0.0) * head_gain
         head_z = heads["z"] + actions.get("roll", 0.0) * head_gain
