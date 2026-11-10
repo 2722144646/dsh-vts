@@ -1495,6 +1495,10 @@ class AvatarEngine:
         if self.mixer.actions:
             return  # something is already playing; never stack idle cues
         self.presence.observe(self._presence_inputs())
+        # Idle rate/intensity follow the current feeling, not just the profile:
+        # a low mood moves less often and more gently.
+        affect = getattr(self.mixer, "affect", None)
+        self.presence.set_mood(float(getattr(affect, "valence", 0.0) or 0.0))
         silence = (
             time.perf_counter() - self._last_voice_at if self._last_voice_at else 0.0
         )

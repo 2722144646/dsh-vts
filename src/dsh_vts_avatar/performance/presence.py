@@ -65,6 +65,9 @@ class PresenceDirector:
     """Chooses idle cues from mood + relationship + diary, using model batches."""
 
     base_energy: float = 0.55
+    #: Continuous mood in -1..1. Low mood means fewer and gentler idle motions;
+    #: bright mood means she fidgets a little more. Set by the engine each tick.
+    mood: float = 0.0
     rng: random.Random = field(default_factory=random.Random)
     library_path: str = ""
     profile: PresenceProfile = field(default_factory=PresenceProfile)
@@ -236,6 +239,22 @@ class PresenceDirector:
 
     # -- scheduling -------------------------------------------------------
 
+    def set_mood(self, mood: float) -> None:
+        """Attach the current feeling; it scales rate and intensity, not the pool."""
+        try:
+            value = float(mood)
+        except (TypeError, ValueError):
+            value = 0.0
+        self.mood = max(-1.0, min(1.0, value))
+
+    def mood_rate(self) -> float:
+        """Gap multiplier: low mood stretches the silence, bright mood shortens it."""
+        return max(0.6, min(1.6, 1.0 - 0.35 * self.mood))
+
+    def mood_gain(self) -> float:
+        """Intensity multiplier: a low mood moves less even when it does move."""
+        return max(0.7, min(1.1, 0.9 + 0.10 * self.mood))
+
     def observe(self, inputs: dict) -> PresenceProfile:
         """Update the profile; a bucket change asks for a fresh batch."""
         previous = self.profile.key
@@ -292,6 +311,7 @@ class PresenceDirector:
         kind = self.rng.choices(kinds, weights=weights, k=1)[0]
         self._last = (self._last + [kind])[-4:]
         intensity = candidates[kind].get("i") or 0.45 + 0.35 * min(1.0, self.profile.energy)
+        intensity = float(intensity) * self.mood_gain()
         return kind, round(min(1.2, max(0.1, intensity)), 3)
 
     def next_cue(
@@ -302,7 +322,7 @@ class PresenceDirector:
             return None
         if now < self._next_at:
             return None
-        self._next_at = now + next_gap(silence_s, self.rng)
+        self._next_at = now + next_gap(silence_s, self.rng) * self.mood_rate()
         if silence_s >= 300 and self.rng.random() < 0.4:
             # After a long silence she looks over once in a while instead of
             # fidgeting in place.
@@ -310,7 +330,8 @@ class PresenceDirector:
             for kind in ("idle_look_user", "idle_glance"):
                 if kind in pool and kind not in self._last[-2:]:
                     self._last = (self._last + [kind])[-4:]
-                    return kind, round(float(pool[kind].get("i", 0.5)), 3)
+                    value = float(pool[kind].get("i", 0.5)) * self.mood_gain()
+                    return kind, round(min(1.2, max(0.1, value)), 3)
         return self._pick(now)
 
 
