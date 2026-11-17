@@ -39,7 +39,9 @@ Thumbs.db
 .vscode/
 
 # Local tooling
-tools/
+# Root-only: an unanchored tools/ also swallowed src/dsh_vts_avatar/tools/,
+# which is real application code (panel.py, chat_viewer.py).
+/tools/
 tmp-*/
 *.tmp
 
