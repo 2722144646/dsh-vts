@@ -34,6 +34,28 @@ const RELATION_GUIDANCE = [
   '  只负责判断这扇门现在该不该开。',
 ].join('\n');
 
+// Rational/emotional lean. The value is a processing mode, not a mood: it
+// changes how much is expressed and what comes first, never the facts.
+const TONE_GUIDANCE = [
+  '## 理性 / 感性倾向',
+  '',
+  '倾向值 0–100，左理性右感性。用户可以定基准；你也可以直接设定当前值',
+  '（vts_avatar_tone），到期会自动回到用户的基准；用户一动滑杆，你的设定立刻作废。',
+  '',
+  '不用你算期限：系统按你的心情强度和对方的依赖程度决定能维持多久，',
+  '调用后在返回值里告诉你实际时长和最终比例。',
+  '',
+  '什么时候偏哪边：',
+  '- 对方在倾诉、难受、示弱 → 偏感性',
+  '- 对方生气、对抗、指责 → 偏理性，先降温，不跟着上头',
+  '- 讨论事实、技术、风险、决策 → 偏理性',
+  '- 对方开玩笑、亲近 → 偏感性',
+  '- 自己刚说错话 → 偏理性，先核对',
+  '',
+  '拿不准就不调，不调用同样合法。',
+  '值只改浓度和顺序，不改事实判断：偏理性不等于冷淡，偏感性不等于不讲事实。',
+].join('\n');
+
 // Self-knowledge block: what this project is, where the docs are, and when the
 // agent is allowed to change things on its own. The keyword list is editable by
 // the agent itself (vts_avatar_self), so it can grow its own trigger words.
@@ -365,6 +387,11 @@ export function apply(ctx, config = {}) {
         name: 'plugin:dsh-vts-avatar',
         order: 250,
         text: EMOTION_GUIDANCE,
+      }),
+      ctx.systemPrompt.section({
+        name: 'plugin:dsh-vts-avatar:tone',
+        order: 254,
+        text: TONE_GUIDANCE,
       }),
       ctx.systemPrompt.section({
         name: 'plugin:dsh-vts-avatar:relation',

@@ -183,7 +183,19 @@ class BridgeServer:
             await ws.send(orjson.dumps({"type": "settings.get.result", "request_id": msg.get("request_id"), **self.engine.settings_snapshot()}).decode("utf-8"))
         elif mtype == "settings.set":
             result = self.engine.save_settings(msg.get("values") if isinstance(msg.get("values"), dict) else {})
+            # Gains and the lean apply live; refresh every client's prompt copy.
+            if result.get("ok"):
+                await self.engine.push_mood()
             await ws.send(orjson.dumps({"type": "settings.set.result", "request_id": msg.get("request_id"), **result}).decode("utf-8"))
+        elif mtype == "tone.set":
+            result = self.engine.set_tone(msg.get("value"), str(msg.get("reason") or ""))
+            if result.get("ok"):
+                await self.engine.push_mood()
+            await ws.send(orjson.dumps({"type": "tone.set.result", "request_id": msg.get("request_id"), **result}).decode("utf-8"))
+        elif mtype == "tone.clear":
+            result = self.engine.clear_tone()
+            await self.engine.push_mood()
+            await ws.send(orjson.dumps({"type": "tone.clear.result", "request_id": msg.get("request_id"), **result}).decode("utf-8"))
         elif mtype == "diary.folder":
             await ws.send(orjson.dumps({"type": "diary.folder.result", "request_id": msg.get("request_id"), **self.engine.open_diary_folder()}).decode("utf-8"))
         elif mtype == "self.get":

@@ -43,6 +43,31 @@ MOUTH_DUCK = 0.25
 def duck_smile(value: float, duck: float) -> float:
     """Shrink an expression around the neutral input instead of around zero."""
     return NEUTRAL_SMILE + (float(value) - NEUTRAL_SMILE) * duck
+
+
+#: How far the loudness curve separates a whispered syllable from a stressed one.
+#: The floor used to be 0.72, which meant every syllable opened at least 72% of
+#: its target: the mouth moved, but stress was invisible. 0.45 gives weak and
+#: strong syllables a visibly different size while normal speech stays near the
+#: top of the range (env is ~0.8 for ordinary talking, so amp is still ~0.96).
+SPEECH_FLOOR = 0.45
+#: Same idea for the vowel channel. Kept lower than the open floor so the vowel
+#: shape itself never disappears on a quiet syllable.
+VOICE_FLOOR = 0.40
+
+
+def speech_amp(env: float) -> float:
+    """Loudness multiplier for MouthOpen, 0.45 (quiet) .. 1.0 (loud).
+
+    Shared by every vowel path so a diphthong and a plain vowel respond to
+    stress the same way.
+    """
+    return SPEECH_FLOOR + (1.0 - SPEECH_FLOOR) * float(env)
+
+
+def voice_amp(env: float) -> float:
+    """Loudness multiplier for the VoiceA/I/U/E/O channel."""
+    return VOICE_FLOOR + (1.0 - VOICE_FLOOR) * float(env)
 SHAPE_X = {"A": 0.0, "I": 0.15, "U": -0.30, "E": 0.0, "O": 0.30}
 DIPHTHONGS: dict[str, tuple[str, str]] = {
     "ai": ("a", "i"),
@@ -153,6 +178,8 @@ class PerformanceMixer:
         # Phase 2 baseline: slow mood layer under the transient affect.
         self.baseline = None
         self.baseline_weight = 0.0
+        # Effective rational/emotional lean; None means "read avatar config".
+        self.emotionality: float | None = None
         self._affect_stamp = 0.0
         self._last_turn_sample = -10**9
         self._mouth_backend = self._decide_backend()
@@ -231,12 +258,39 @@ class PerformanceMixer:
         """Attach the slow mood baseline; 0 disables it and restores old behavior."""
         self.baseline = state
         self.baseline_weight = max(0.0, min(1.0, float(weight)))
+    def set_emotionality(self, value: float | None) -> None:
+        """Attach the effective rational/emotional lean (0..100); None = config."""
+        self.emotionality = None if value is None else clamp(float(value), 0.0, 100.0)
+
+    def _emotionality(self) -> float:
+        """0 = fully rational, 1 = fully emotional."""
+        raw = self.emotionality
+        if raw is None:
+            raw = getattr(self.avatar, "emotionality", 50.0)
+        return clamp(float(raw) / 100.0, 0.0, 1.0)
+
+    def _tone_gain(self, name: str, default: float) -> float:
+        """Gain that follows the dial: rational is quieter, emotional is louder."""
+        value = self._gain(name, default)
+        e = self._emotionality()
+        if name == "expression_gain":
+            return value * (0.6 + 0.8 * e)
+        if name == "exaggeration_gain":
+            return value * (0.85 + 0.3 * e)
+        return value
 
     #: How long a described feeling holds before it starts fading, and the
     #: release time constant. Evidence only arrives when someone speaks, so
     #: without a decay the last `feel()` would smile forever.
-    AFFECT_HOLD_S = 2.0
-    AFFECT_RELEASE_S = 2.2
+    #: Both stretch with the rational/emotional lean: an emotional character
+    #: holds a feeling longer, a rational one drops it quickly.
+    @property
+    def AFFECT_HOLD_S(self) -> float:  # noqa: N802 - kept as a public name
+        return 1.0 + 2.0 * self._emotionality()
+
+    @property
+    def AFFECT_RELEASE_S(self) -> float:  # noqa: N802 - kept as a public name
+        return 1.2 + 2.0 * self._emotionality()
 
     def _update_affect(self, dt: float) -> None:
         if not self.use_affect or self.affect is None:
@@ -376,7 +430,7 @@ class PerformanceMixer:
             else None
         )
         mapping_strength = clamp(
-            self.emotion.preset_intensity * self._gain("expression_gain", 1.0),
+            self.emotion.preset_intensity * self._tone_gain("expression_gain", 1.0),
             0.0,
             1.0,
         )
@@ -517,7 +571,7 @@ class PerformanceMixer:
         # sad. The values are expression targets already blended by the mixer.
         idle_gaze_x, idle_gaze_y = self._gaze.update(now)
         gaze_blend = 1.0 - clamp(
-            self.emotion.preset_intensity * self._gain("expression_gain", 1.0), 0.0, 1.0
+            self.emotion.preset_intensity * self._tone_gain("expression_gain", 1.0), 0.0, 1.0
         ) * 0.85
         if self.state == "listening":
             # Keep eye contact while the other side is talking; do not drift
@@ -677,8 +731,8 @@ class PerformanceMixer:
         return base
 
     def _vowel_shape(self, spec: VisemeSpec, env: float) -> dict[str, object]:
-        amp = 0.72 + 0.28 * env
-        vowel = spec.vowel_gain * (0.65 + 0.35 * env)
+        amp = speech_amp(env)
+        vowel = spec.vowel_gain * voice_amp(env)
         return {
             "open": spec.open * amp,
             "form": spec.form,
@@ -714,9 +768,9 @@ class PerformanceMixer:
         # Vowel: RMS modulates amplitude, but the model's useful visual range
         # must be reached on normal speech; a low floor made every mouth look
         # half-open. The viseme openness already encodes the vowel identity.
-        amp = 0.72 + 0.28 * env
+        amp = speech_amp(env)
         open_value = segment.open * amp
-        vowel = segment.vowel_gain * (0.65 + 0.35 * env)
+        vowel = segment.vowel_gain * voice_amp(env)
         voice = {self._voice_param(segment.viseme): vowel}
         return {"open": open_value, "form": segment.form, "voice": voice, "viseme": segment.viseme}
 
@@ -736,10 +790,12 @@ class PerformanceMixer:
         if self.use_affect and self.affect is not None:
             # Phase 2: multi-label blend; the neutral base and the intensity
             # ramp live in the composer, not here.
-            face = compose_face(self.affect, self._gain("expression_gain", 1.0))
+            face = compose_face(self.affect, self._tone_gain("expression_gain", 1.0))
             if self.baseline is not None and self.baseline_weight > 0:
-                base = compose_face(self.baseline, self._gain("expression_gain", 1.0))
-                weight = self.baseline_weight
+                base = compose_face(self.baseline, self._tone_gain("expression_gain", 1.0))
+                # A rational character does not carry a mood around; an
+                # emotional one does.
+                weight = self.baseline_weight * self._emotionality()
                 for key in face:
                     face[key] = face[key] * (1.0 - weight) + base.get(key, 0.0) * weight
             return face
@@ -747,7 +803,9 @@ class PerformanceMixer:
             # Idle with a mood: the baseline alone keeps the face off neutral.
             return compose_face(
                 self.baseline,
-                self._gain("expression_gain", 1.0) * self.baseline_weight,
+                self._tone_gain("expression_gain", 1.0)
+                * self.baseline_weight
+                * self._emotionality(),
             )
         if self.emotion.preset == "neutral" or self.emotion.preset_intensity < 0.08:
             # The model maps MouthSmile through MouthForm -1..1 and Brows
@@ -792,7 +850,7 @@ class PerformanceMixer:
         }
         expression = EXPRESSION_TARGETS.get(self.emotion.preset)
         strength = clamp(
-            self.emotion.preset_intensity * self._gain("expression_gain", 1.0),
+            self.emotion.preset_intensity * self._tone_gain("expression_gain", 1.0),
             0.0,
             1.0,
         )

@@ -73,6 +73,10 @@ class AvatarConfig:
     exaggeration_gain: float = 1.30
     # L2 mood baseline under the transient affect; 0 = off (old behavior).
     baseline_weight: float = 0.0
+    # Rational/emotional lean: 0 = fully rational, 100 = fully emotional.
+    # The user sets this anchor in the settings panel; the agent may set a
+    # temporary value and the engine shifts it with mood and relationship.
+    emotionality: float = 50.0
     blink_per_min: float = 14.0
     mouth_backend: str = "auto"
     mouth_open: str = "MouthOpen"
@@ -295,6 +299,7 @@ def load_config(path: str | Path | None = None) -> Config:
         exaggeration_share=float(avatar_raw.get("exaggeration_share", 0.30)),
         exaggeration_gain=float(avatar_raw.get("exaggeration_gain", 1.30)),
         baseline_weight=float(avatar_raw.get("baseline_weight", 0.0)),
+        emotionality=float(avatar_raw.get("emotionality", 50.0)),
         blink_per_min=float(avatar_raw.get("blink_per_min", 14.0)),
         mouth_backend=str(avatar_raw.get("mouth_backend", "auto")),
         mouth_open=str(avatar_raw.get("mouth_open", "MouthOpen")),

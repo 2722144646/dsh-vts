@@ -97,6 +97,12 @@ class AvatarEngine:
         # Self-knowledge: what this project is, where the docs live, the trigger
         # words the agent may act on by itself, and a private note pad.
         self.self_knowledge = SelfKnowledge(config.root / "data" / "ai" / "self.json")
+        # Rational/emotional dial. The anchor lives in config.avatar.emotionality;
+        # the agent may set an absolute temporary value that expires on its own.
+        self._tone_value: float | None = None
+        self._tone_until: float = 0.0
+        self._tone_reason: str = ""
+        self._tone_set_at: float = 0.0
         self.user_id = "default"
         self.display_name = "default"
         self._last_voice_at = 0.0
@@ -107,6 +113,103 @@ class AvatarEngine:
         self.local_chat = LocalChat(config.llm)
         self.director = LocalDirector(config.llm) if config.llm.director_enabled else None
         self._chat_history: dict[str, deque] = {}
+
+    # -- rational / emotional dial -----------------------------------------
+
+    def emotionality_anchor(self) -> float:
+        """The value the user set with the slider (0 = rational, 100 = emotional)."""
+        try:
+            return max(0.0, min(100.0, float(getattr(self.config.avatar, "emotionality", 50.0))))
+        except (TypeError, ValueError):
+            return 50.0
+
+    def tone_bias(self) -> float:
+        """Small automatic shift from mood and relationship, clamped to ±10."""
+        rel = getattr(self.relationship, "state", None)
+        if rel is None:
+            return 0.0
+        f = float(getattr(rel, "friction", 0.0) or 0.0)
+        c = float(getattr(rel, "closeness", 0.0) or 0.0)
+        t = float(getattr(rel, "trust", 0.0) or 0.0)
+        d = float(getattr(rel, "dependency", 0.0) or 0.0)
+        # Friction makes her careful (rational); closeness and trust let the
+        # guard down (emotional).
+        return max(-10.0, min(10.0, 10.0 * (f - 0.5 * c - 0.3 * t - 0.3 * d)))
+
+    def _mood_intensity(self) -> float:
+        store = getattr(self, "episode_store", None)
+        if store is None:
+            return 0.0
+        try:
+            return float(store.mood(time.time()).intensity or 0.0)
+        except Exception:  # noqa: BLE001 - the dial must never break a turn
+            return 0.0
+
+    def tone_ttl_minutes(self) -> float:
+        """How long an agent-set lean lasts: mood and dependency decide."""
+        rel = getattr(self.relationship, "state", None)
+        dep = float(getattr(rel, "dependency", 0.0) or 0.0) if rel is not None else 0.0
+        fric = float(getattr(rel, "friction", 0.0) or 0.0) if rel is not None else 0.0
+        raw = 15.0 * (0.6 + 0.8 * self._mood_intensity()) * (0.7 + 0.6 * dep) * (1.0 - 0.35 * fric)
+        return max(5.0, min(60.0, raw))
+
+    def emotionality_effective(self) -> float:
+        """Anchor (or the agent's temporary value) plus the automatic bias."""
+        now = time.time()
+        base = self.emotionality_anchor()
+        if self._tone_value is not None:
+            if now < self._tone_until:
+                base = self._tone_value
+            else:
+                self._tone_value = None
+                self._tone_reason = ""
+        return max(0.0, min(100.0, base + self.tone_bias()))
+
+    def tone_state(self) -> dict[str, Any]:
+        now = time.time()
+        temporary = self._tone_value is not None and now < self._tone_until
+        return {
+            "anchor": round(self.emotionality_anchor(), 1),
+            "effective": round(self.emotionality_effective(), 1),
+            "temporary": bool(temporary),
+            "remaining_min": round(max(0.0, (self._tone_until - now) / 60.0), 1) if temporary else 0.0,
+            "reason": self._tone_reason if temporary else "",
+        }
+
+    def set_tone(self, value: Any, reason: str = "") -> dict[str, Any]:
+        """The agent sets an absolute lean; the TTL is computed, not chosen."""
+        try:
+            target = float(value)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "value 必须是 0-100 的数字"}
+        target = max(0.0, min(100.0, target))
+        now = time.time()
+        if now - self._tone_set_at < 60.0:
+            return {"ok": False, "error": "60 秒内已经调过一次，先等一会儿"}
+        ttl = self.tone_ttl_minutes()
+        self._tone_value = target
+        self._tone_until = now + ttl * 60.0
+        self._tone_reason = str(reason or "")[:200]
+        self._tone_set_at = now
+        if self.mixer is not None:
+            self.mixer.set_emotionality(self.emotionality_effective())
+        state = self.tone_state()
+        return {"ok": True, "ttl_min": round(ttl, 1), **state}
+
+    def clear_tone(self) -> dict[str, Any]:
+        """The user moved the slider: their anchor wins immediately."""
+        self._tone_value = None
+        self._tone_reason = ""
+        if self.mixer is not None:
+            self.mixer.set_emotionality(self.emotionality_effective())
+        return {"ok": True, **self.tone_state()}
+
+    async def push_mood(self) -> None:
+        """Broadcast the prompt context so every connected client refreshes."""
+        try:
+            await self._emit({"type": "mood.update", "text": self.mood_payload()["text"]})
+        except Exception:  # noqa: BLE001 - a failed push must not break the call
+            pass
 
     # -- self knowledge ----------------------------------------------------
 
@@ -995,6 +1098,14 @@ class AvatarEngine:
                 + (presence.write_reason or "unknown")
                 + "）"
             )
+        try:
+            tone = self.tone_state()
+            line = "（当前倾向：理性 " + str(int(round(100 - tone["effective"]))) + "%"
+            if tone["temporary"]:
+                line += "，临时，剩余 " + str(tone["remaining_min"]) + " 分钟"
+            text = (text + "\n" if text else "") + line + "）"
+        except Exception:  # noqa: BLE001 - never break the prompt over a dial
+            pass
         return {
             "ok": True,
             "text": text,
@@ -1338,7 +1449,9 @@ class AvatarEngine:
                 "head_gain": a.head_gain, "mouth_gain": a.mouth_gain,
                 "expression_gain": getattr(a, "expression_gain", 1.0),
                 "baseline_weight": a.baseline_weight, "blink_per_min": a.blink_per_min,
+                "emotionality": self.emotionality_anchor(),
             },
+            "tone": self.tone_state(),
             "audio": {
                 "device": au.device, "auto_calibrate": au.auto_calibrate,
                 "calibration_volume": au.calibration_volume,
@@ -1364,7 +1477,30 @@ class AvatarEngine:
             path.write_text(text, encoding="utf-8")
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
-        return {"ok": True, "restart_required": True}
+        # Avatar numbers (gains, blink, emotionality) are read every frame, so
+        # they apply without a restart. LLM/audio/persona still need one.
+        avatar_values = values.get("avatar")
+        if isinstance(avatar_values, dict):
+            for key, raw in avatar_values.items():
+                current = getattr(self.config.avatar, key, None)
+                if isinstance(current, bool):
+                    continue
+                if isinstance(current, (int, float)):
+                    try:
+                        setattr(self.config.avatar, key, float(raw))
+                    except (TypeError, ValueError):
+                        continue
+        restart = False
+        for section in ("llm", "audio"):
+            block = values.get(section)
+            if isinstance(block, dict) and block:
+                restart = True
+        persona = values.get("persona")
+        if isinstance(persona, str) and persona.strip():
+            restart = True
+        if self.mixer is not None:
+            self.mixer.set_emotionality(self.emotionality_effective())
+        return {"ok": True, "restart_required": restart}
 
     def open_diary_folder(self) -> dict[str, Any]:
         import os
@@ -1564,6 +1700,7 @@ class AvatarEngine:
                 else:
                     sample = self.clock.now_sample()
                 self._last_sample = sample
+                self.mixer.set_emotionality(self.emotionality_effective())
                 params = self.mixer.compute(sample, self.timeline, now)
                 self._last_params = params
                 if self.timeline is not None:
